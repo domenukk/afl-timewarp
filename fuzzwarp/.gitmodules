@@ -1,0 +1,3 @@
+[submodule "afl"]
+	path = afl
+	url = https://github.com/mirrorer/afl.git

@@ -1,0 +1,8 @@
+tmp
+afl/qemu_mode/qemu-*
+.vagrant
+*.log
+
+*.d
+*.o
+bin
