@@ -32,6 +32,10 @@
 #include "alloc-inl.h"
 #include "hash.h"
 
+#ifdef TIMEWARP_MODE
+#include "./fuzzwarp/timewarp_dev/src/afl-timewarp.h"
+#endif /* ^TIMEWARP_MODE */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -123,6 +127,12 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
            persistent_mode,           /* Running in persistent mode?      */
            deferred_mode,             /* Deferred forkserver mode?        */
            fast_cal;                  /* Try to calibrate faster?         */
+
+#ifdef TIMEWARP_MODE
+EXP_ST u8  timewarp_mode;             /* Running in TimeWarp mode?        */
+
+static timewarp_stage timewarp_stage; /* The stage TimeWarp is in atm     */
+#endif /* ^TIMEWARP_MODE */
 
 static s32 out_fd,                    /* Persistent fd for out_file       */
            dev_urandom_fd = -1,       /* Persistent fd for /dev/urandom   */
@@ -7891,6 +7901,15 @@ int main(int argc, char** argv) {
 
         break;
 
+#ifdef TIMEWARP_MODE
+      case 'W': /* TimeWarp mode */
+
+        if (timewarp_mode) FATAL("Multiple -W options not supported");
+        timewarp_mode = 1;
+
+        break;
+#endif /* ^TIMEWARP_MODE */
+
       default:
 
         usage(argv[0]);
@@ -7927,6 +7946,14 @@ int main(int argc, char** argv) {
 
   if (dumb_mode == 2 && no_forkserver)
     FATAL("AFL_DUMB_FORKSRV and AFL_NO_FORKSRV are mutually exclusive");
+
+#ifdef TIMEWARP_MODE
+  if (timewarp_mode) {
+    if (!qemu_mode) FATAL("TimeWarp Mode (-W) only supported with QEMU instrumentation (-Q) at this moment");
+    if (out_file) FATAL("TimeWarp Mode (-W) can only be used to fuzz standard input. -W and -f are mutually exclusive");
+    if (no_forkserver) FATAL("TimeWarp Mode (-W) and AFL_NO_FORKSRV are mutually exclusive");
+  }
+#endif /* ^TIMEWARP_MODE */
 
   if (getenv("AFL_PRELOAD")) {
     setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
