@@ -1,5 +1,3 @@
-#define TIMEWARP_MODE
-
 #include <stdio.h>
 #include "./afl-timewarp.c"
 
@@ -9,7 +7,7 @@
 int main(int argc, int argv) {
     printf("starting.");
     int pipefd[2];
-    start_timewarp_server(8081, pipefd);
+    start_timewarp_server("8081", pipefd);
     while(1) {
         printf("%s", get_last_action());
         sleep(1000); 

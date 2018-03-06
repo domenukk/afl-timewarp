@@ -131,7 +131,7 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
 #ifdef TIMEWARP_MODE
 EXP_ST u8  timewarp_mode;             /* Running in TimeWarp mode?        */
 
-static timewarp_stage timewarp_stage; /* The stage TimeWarp is in atm     */
+static timewarp_stage warp_stage;     /* The stage TimeWarp is in atm     */
 #endif /* ^TIMEWARP_MODE */
 
 static s32 out_fd,                    /* Persistent fd for out_file       */
@@ -7709,7 +7709,21 @@ static void save_cmdline(u32 argc, char** argv) {
 }
 
 
+#ifdef TIMEWARP_MODE
+void run_to_timewarp() {
+
+
+}
+
+void timewarp() {
+  FATAL("Should really implement timewarp mode at some point. TODO :)");
+}
+
+
+#endif /* ^TIMEWARP_MODE */
+
 #ifndef AFL_LIB
+
 
 /* Main entry point */
 
@@ -7718,15 +7732,20 @@ int main(int argc, char** argv) {
   s32 opt;
   u64 prev_queued = 0;
   u32 sync_interval_cnt = 0, seek_to;
-  u8  *extras_dir = 0;
-  u8  mem_limit_given = 0;
-  u8  exit_1 = !!getenv("AFL_BENCH_JUST_ONE");
-  char** use_argv;
+  u8 *extras_dir = 0;
+  u8 mem_limit_given = 0;
+  u8 exit_1 = !!getenv("AFL_BENCH_JUST_ONE");
+  char **use_argv;
 
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "afl-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>\n");
+  SAYF(cCYA
+           "afl-fuzz "
+           cBRI
+           VERSION
+           cRST
+           " by <lcamtuf@google.com>\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
@@ -7754,28 +7773,29 @@ int main(int argc, char** argv) {
 
       case 'M': { /* master sync ID */
 
-          u8* c;
+        u8 *c;
 
-          if (sync_id) FATAL("Multiple -S or -M options not supported");
-          sync_id = ck_strdup(optarg);
+        if (sync_id) FATAL("Multiple -S or -M options not supported");
+        sync_id = ck_strdup(optarg);
 
-          if ((c = strchr(sync_id, ':'))) {
+        if ((c = strchr(sync_id, ':'))) {
 
-            *c = 0;
+          *c = 0;
 
-            if (sscanf(c + 1, "%u/%u", &master_id, &master_max) != 2 ||
-                !master_id || !master_max || master_id > master_max ||
-                master_max > 1000000) FATAL("Bogus master ID passed to -M");
-
-          }
-
-          force_deterministic = 1;
+          if (sscanf(c + 1, "%u/%u", &master_id, &master_max) != 2 ||
+              !master_id || !master_max || master_id > master_max ||
+              master_max > 1000000)
+            FATAL("Bogus master ID passed to -M");
 
         }
 
+        force_deterministic = 1;
+
+      }
+
         break;
 
-      case 'S': 
+      case 'S':
 
         if (sync_id) FATAL("Multiple -S or -M options not supported");
         sync_id = ck_strdup(optarg);
@@ -7795,55 +7815,65 @@ int main(int argc, char** argv) {
 
       case 't': { /* timeout */
 
-          u8 suffix = 0;
+        u8 suffix = 0;
 
-          if (timeout_given) FATAL("Multiple -t options not supported");
+        if (timeout_given) FATAL("Multiple -t options not supported");
 
-          if (sscanf(optarg, "%u%c", &exec_tmout, &suffix) < 1 ||
-              optarg[0] == '-') FATAL("Bad syntax used for -t");
+        if (sscanf(optarg, "%u%c", &exec_tmout, &suffix) < 1 ||
+            optarg[0] == '-')
+          FATAL("Bad syntax used for -t");
 
-          if (exec_tmout < 5) FATAL("Dangerously low value of -t");
+        if (exec_tmout < 5) FATAL("Dangerously low value of -t");
 
-          if (suffix == '+') timeout_given = 2; else timeout_given = 1;
+        if (suffix == '+') timeout_given = 2; else timeout_given = 1;
 
-          break;
+        break;
 
       }
 
       case 'm': { /* mem limit */
 
-          u8 suffix = 'M';
+        u8 suffix = 'M';
 
-          if (mem_limit_given) FATAL("Multiple -m options not supported");
-          mem_limit_given = 1;
+        if (mem_limit_given) FATAL("Multiple -m options not supported");
+        mem_limit_given = 1;
 
-          if (!strcmp(optarg, "none")) {
+        if (!strcmp(optarg, "none")) {
 
-            mem_limit = 0;
-            break;
-
-          }
-
-          if (sscanf(optarg, "%llu%c", &mem_limit, &suffix) < 1 ||
-              optarg[0] == '-') FATAL("Bad syntax used for -m");
-
-          switch (suffix) {
-
-            case 'T': mem_limit *= 1024 * 1024; break;
-            case 'G': mem_limit *= 1024; break;
-            case 'k': mem_limit /= 1024; break;
-            case 'M': break;
-
-            default:  FATAL("Unsupported suffix or bad syntax for -m");
-
-          }
-
-          if (mem_limit < 5) FATAL("Dangerously low value of -m");
-
-          if (sizeof(rlim_t) == 4 && mem_limit > 2000)
-            FATAL("Value of -m out of range on 32-bit systems");
+          mem_limit = 0;
+          break;
 
         }
+
+        if (sscanf(optarg, "%llu%c", &mem_limit, &suffix) < 1 ||
+            optarg[0] == '-')
+          FATAL("Bad syntax used for -m");
+
+        switch (suffix) {
+
+          case 'T':
+            mem_limit *= 1024 * 1024;
+            break;
+          case 'G':
+            mem_limit *= 1024;
+            break;
+          case 'k':
+            mem_limit /= 1024;
+            break;
+          case 'M':
+            break;
+
+          default:
+            FATAL("Unsupported suffix or bad syntax for -m");
+
+        }
+
+        if (mem_limit < 5) FATAL("Dangerously low value of -m");
+
+        if (sizeof(rlim_t) == 4 && mem_limit > 2000)
+          FATAL("Value of -m out of range on 32-bit systems");
+
+      }
 
         break;
 
@@ -7929,15 +7959,15 @@ int main(int argc, char** argv) {
   if (dumb_mode) {
 
     if (crash_mode) FATAL("-C and -n are mutually exclusive");
-    if (qemu_mode)  FATAL("-Q and -n are mutually exclusive");
+    if (qemu_mode) FATAL("-Q and -n are mutually exclusive");
 
   }
 
-  if (getenv("AFL_NO_FORKSRV"))    no_forkserver    = 1;
-  if (getenv("AFL_NO_CPU_RED"))    no_cpu_meter_red = 1;
-  if (getenv("AFL_NO_ARITH"))      no_arith         = 1;
-  if (getenv("AFL_SHUFFLE_QUEUE")) shuffle_queue    = 1;
-  if (getenv("AFL_FAST_CAL"))      fast_cal         = 1;
+  if (getenv("AFL_NO_FORKSRV")) no_forkserver = 1;
+  if (getenv("AFL_NO_CPU_RED")) no_cpu_meter_red = 1;
+  if (getenv("AFL_NO_ARITH")) no_arith = 1;
+  if (getenv("AFL_SHUFFLE_QUEUE")) shuffle_queue = 1;
+  if (getenv("AFL_FAST_CAL")) fast_cal = 1;
 
   if (getenv("AFL_HANG_TMOUT")) {
     hang_tmout = atoi(getenv("AFL_HANG_TMOUT"));
@@ -7949,7 +7979,7 @@ int main(int argc, char** argv) {
 
 #ifdef TIMEWARP_MODE
   if (timewarp_mode) {
-    if (!qemu_mode) FATAL("TimeWarp Mode (-W) only supported with QEMU instrumentation (-Q) at this moment");
+    if (!qemu_mode) FATAL("TimeWarp Mode (-W) is currently only supported with QEMU instrumentation (-Q)");
     if (out_file) FATAL("TimeWarp Mode (-W) can only be used to fuzz standard input. -W and -f are mutually exclusive");
     if (no_forkserver) FATAL("TimeWarp Mode (-W) and AFL_NO_FORKSRV are mutually exclusive");
   }
@@ -8004,6 +8034,16 @@ int main(int argc, char** argv) {
     use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
   else
     use_argv = argv + optind;
+
+#ifdef TIMEWARP_MODE
+  if (timewarp_mode) {
+    run_to_timewarp();
+    if (stop_soon) goto stop_fuzzing;
+    if (warp_stage == STAGE_TIMEWARP) {
+      timewarp();
+    }
+  }
+#endif /* ^TIMEWARP_MODE */
 
   perform_dry_run(use_argv);
 

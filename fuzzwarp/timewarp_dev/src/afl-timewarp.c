@@ -1,7 +1,7 @@
-#ifdef TIMEWARP_MODE
 /*
-** server.c -- a stream socket server demo
+** afl-timewarp.c -- TimeWarp mode fun
 */
+#ifdef TIMEWARP_MODE
 
 #include "afl-timewarp.h"
 
@@ -252,4 +252,4 @@ char *timewarp_stage_name(timewarp_stage stage) {
   }
 }
 
-// #endif //timewarp
+#endif /* ^TIMEWARP_MODE */

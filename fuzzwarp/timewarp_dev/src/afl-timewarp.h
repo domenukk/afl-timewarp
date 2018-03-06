@@ -5,8 +5,9 @@
 #ifndef FUZZWARP_AFL_TIMEWARP_H
 #define FUZZWARP_AFL_TIMEWARP_H
 
+#ifdef TIMEWARP_MODE
 
-typedef enum _TIMEWARP_STATE {
+typedef enum _timewarp_stage {
     STAGE_LEARN = 'L',
     STAGE_TIMEWARP = 'W',
     STAGE_FUZZ = 'F',
@@ -37,5 +38,5 @@ timewarp_stage get_last_action();
 void timewarp_tidy();
 
 
-
-#endif //FUZZWARP_AFL_TIMEWARP_H
+#endif /* ^TIMEWARP_MODE */
+#endif /* ^FUZZWARP_AFL_TIMEWARP_H */
