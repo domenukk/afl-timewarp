@@ -18,27 +18,30 @@ add_definitions(-DMISC_PATH="./share/afl")
 
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_C_STANDARD 11)
 
 add_executable(fuzzwarp
-        experimental/post_library/post_library.so.c
-        experimental/post_library/post_library_png.so.c
-        fuzzwarp/timewarp_dev/src/afl-timewarp.c
-        fuzzwarp/timewarp_dev/src/timewarp_test.c
-        fuzzwarp/reviveme.c
-        libdislocator/libdislocator.so.c
-        libtokencap/libtokencap.so.c
         qemu_mode/patches/afl-qemu-cpu-inl.h
-        afl-analyze.c
-        afl-as.c
-        afl-as.h
         afl-fuzz.c
-        afl-gcc.c
-        afl-gotcpu.c
-        afl-showmap.c
-        afl-tmin.c
         alloc-inl.h
         config.h
         debug.h
         hash.h
-        test-instr.c
-        types.h fuzzwarp/timewarp_dev/src/afl-timewarp.h)
+        types.h
+        fuzzwarp/timewarp_dev/src/afl-timewarp.h)
+
+add_executable(reviveme
+        fuzzwarp/reviveme.c)
+
+add_executable(timewarp_test
+        fuzzwarp/timewarp_dev/src/timewarp_test.c
+        )
+
+find_package( ZLIB REQUIRED )
+if ( ZLIB_FOUND )
+    include_directories( ${ZLIB_INCLUDE_DIRS} )
+    target_link_libraries(fuzzwarp ${ZLIB_LIBRARIES} )
+endif( ZLIB_FOUND )
+
+target_link_libraries(fuzzwarp ${CMAKE_DL_LIBS})
+
