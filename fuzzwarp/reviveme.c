@@ -4,59 +4,67 @@
 #define OK       0
 #define NO_INPUT 1
 #define TOO_LONG 2
-static int getLine (char *prmpt, char *buff, size_t sz) {
-    int ch, extra;
 
-    // Get line with buffer overrun protection.
-    if (prmpt != NULL) {
-        printf ("%s", prmpt);
-        fflush (stdout);
-    }
-    if (fgets (buff, sz, stdin) == NULL) {
-        return NO_INPUT;
-    }
+static int getLine(char *prmpt, char *buff, size_t sz) {
+  int ch, extra;
 
-    // If it was too long, there'll be no newline. In that case, we flush
-    // to end of line so that excess doesn't affect the next call.
-    if (buff[strlen(buff)-1] != '\n') {
-        extra = 0;
-        while (((ch = getchar()) != '\n') && (ch != EOF))
-            extra = 1;
-        return (extra == 1) ? TOO_LONG : OK;
-    }
+  // Get line with buffer overrun protection.
+  if (prmpt != NULL) {
+    printf("%s", prmpt);
+    fflush(stdout);
+  }
+  if (fgets(buff, sz, stdin) == NULL) {
+    return NO_INPUT;
+  }
 
-    // Otherwise remove newline and give string back to caller.
-    buff[strlen(buff)-1] = '\0';
-    return OK;
+  // If it was too long, there'll be no newline. In that case, we flush
+  // to end of line so that excess doesn't affect the next call.
+  if (buff[strlen(buff) - 1] != '\n') {
+    extra = 0;
+    while (((ch = getchar()) != '\n') && (ch != EOF))
+      extra = 1;
+    return (extra == 1) ? TOO_LONG : OK;
+  }
+
+  // Otherwise remove newline and give string back to caller.
+  buff[strlen(buff) - 1] = '\0';
+  return OK;
 }
 
 
 // Test program for getLine().
 
-int main (void) {
-    int rc;
-    char buff[10];
-    char complete[sizeof(buff) * 2];
+int main(void) {
+  int rc;
 
-    rc = getLine("Enter String> ", buff, sizeof(buff));
-    if (rc == NO_INPUT) {
-        // Extra NL since my system doesn't output that on EOF.
-        printf ("\nNo Input\n");
-        return 1;
-    }
+  char pw[128];
+  char buf[sizeof(pw)];
+  char complete[sizeof(buf) * 2];
 
-    if (rc == TOO_LONG) {
-        printf("Input too long [%s]\n", buff);
-        return 1;
-    }
+  rc = getLine("Enter 8 Char Pwd> ", buf, sizeof(buf));
+  if (rc == NO_INPUT) {
+    // Extra NL since my system doesn't output that on EOF.
+    return printf("\nNo Input\n");
+  }
+  if (rc == TOO_LONG) {
+    return printf("Input too long [%s]\n", buf);
+  }
 
-    strncat(complete, buff, sizeof(complete));
+  getLine("Same Pwd again> ", pw, sizeof(pw));
+  if (strlen(pw) < 8) {
+    return fprintf(stderr, "Password needs to be 8 chars");
+  }
+  if (strncmp(buf, pw, sizeof(buf)) != 0) {
+    return fprintf(stderr, "Passwords did not match.");
+  }
 
-    rc = getLine("Next String> ", buff, sizeof(buff));
+  strncat(complete, buf, sizeof(complete));
 
-    strncat(complete + strlen(complete), buff, sizeof(complete - strlen(complete)));
+  getLine("String to append to pwd> ", buf, sizeof(buf));
 
-    printf("We got [%s]\n", complete);
+  strncat(complete + strlen(complete), buf, sizeof(complete - strlen(complete)));
 
-    return 0;
+  printf("We got [%s]\n", complete);
+
+  return 0;
 }

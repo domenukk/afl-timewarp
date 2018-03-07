@@ -1,16 +1,19 @@
+#include <unistd.h>
 #include <stdio.h>
-#include "./afl-timewarp.c"
+#include "afl-timewarp.h"
 
+#define PORT "8081"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 int main(int argc, int argv) {
-    printf("starting.");
+  printf("starting.");
     int pipefd[2];
-    start_timewarp_server("8081", pipefd);
+    int ret = start_timewarp_server(PORT, pipefd);
+    printf("Started on port %s, ret: %d\n", PORT, ret);
     while(1) {
-        printf("%s", get_last_action());
-        sleep(1000); 
+        printf("%s\n", timewarp_stage_name(get_last_action()));
+        sleep(1);
     }
     return 0;
 }

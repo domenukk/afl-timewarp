@@ -35,6 +35,8 @@ add_executable(reviveme
 
 add_executable(timewarp_test
         fuzzwarp/timewarp_dev/src/timewarp_test.c
+        fuzzwarp/timewarp_dev/src/afl-timewarp.h
+        fuzzwarp/timewarp_dev/src/afl-timewarp.c
         )
 
 find_package( ZLIB REQUIRED )
