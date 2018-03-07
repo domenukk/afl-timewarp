@@ -139,7 +139,7 @@ echo "[+] Patching done."
 
 CFLAGS="-O3 -ggdb" ./configure --disable-system \
   --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
-  --target-list="${CPU_TARGET}-linux-user" --enable-pie --enable-kvm || exit 1
+  --target-list="${CPU_TARGET}-linux-user" --python=$(which python2) --enable-pie --enable-kvm || exit 1
 
 echo "[+] Configuration complete."
 
