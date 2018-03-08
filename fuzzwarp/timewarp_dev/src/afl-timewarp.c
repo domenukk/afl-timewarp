@@ -4,6 +4,7 @@
 #ifdef TIMEWARP_MODE
 
 #include "afl-timewarp.h"
+#include "../../../debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,14 +98,16 @@ static void child_handle_input(int socket_fd, int *pipefd, int child_pid) {
 
 #pragma clang diagnostic pop
 
-// This actually starts the cnc server after the initial process has been forked.
-static int _start_timewarp_server(char *port, int *pipefd) {
+/*
+ * Open a listening socket on the given port.
+ * Will totally kill the application if an error occurs.
+ * Returns the fd of the listening socket (call accept on it)
+ */
 
-  int sockfd = 0;
-  int new_fd = 0;
+static int open_server_socket(char *port) {
+  int sock_fd = 0;
   struct addrinfo hints, *servinfo, *p;
   struct sockaddr_storage their_addr; // connector's address information
-  socklen_t sin_size;
   struct sigaction sa;
   int yes = 1;
   char s[INET6_ADDRSTRLEN];
@@ -115,56 +118,56 @@ static int _start_timewarp_server(char *port, int *pipefd) {
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
 
-  if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
-    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-    return 1;
-  }
+  if ((rv = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) FATAL("Getaddrinfo error: %s\n", gai_strerror(rv));
 
   // loop through all the results and bind to the first we can
   for (p = servinfo; p != NULL; p = p->ai_next) {
-    if ((sockfd = socket(p->ai_family, p->ai_socktype,
+    if ((sock_fd = socket(p->ai_family, p->ai_socktype,
                          p->ai_protocol)) == -1) {
       perror("server: socket");
       continue;
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-      perror("setsockopt");
-      exit(1);
-    }
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) PFATAL("Setsockopt failed");
 
-    if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-      close(sockfd);
+    if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
+      close(sock_fd);
       perror("server: bind");
       continue;
     }
 
     break;
   }
-  if (!sockfd) {
-    perror("No socket found");
-    exit(1);
-  }
 
-  freeaddrinfo(servinfo); // all done with this structure
+  if (!sock_fd) PFATAL("No socket found");
 
-  if (p == NULL) {
-    fprintf(stderr, "server: failed to bind\n");
-    exit(1);
-  }
+  freeaddrinfo(servinfo);
 
-  if (listen(sockfd, BACKLOG) == -1) {
-    perror("listen");
-    exit(1);
-  }
+  if (!p) FATAL("server: failed to bind to port %s\n", port);
+  if (listen(sock_fd, BACKLOG) == -1) PFATAL("Unable to listen on socket %s\n", port);
 
   sa.sa_handler = sigchld_handler; // reap all dead processes
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART;
-  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-    perror("sigaction");
-    exit(1);
-  }
+  if (sigaction(SIGCHLD, &sa, NULL) == -1) PFATAL("Error in sigaction ");
+
+  SAYF("Started listening socket on port %s\n", port);
+  return sock_fd;
+}
+
+// This actually starts the cnc server after the initial process has been forked.
+static int _start_timewarp_server(char *port, int *pipefd) {
+
+  int new_fd = 0;
+  struct addrinfo hints, *servinfo, *p;
+  struct sockaddr_storage their_addr; // connector's address information
+  socklen_t sin_size;
+  struct sigaction sa;
+  int yes = 1;
+  char s[INET6_ADDRSTRLEN];
+  int rv;
+
+  int sockfd = open_server_socket(port);
 
   printf("server: waiting for connection on Port %s...\n", port);
 
@@ -196,13 +199,18 @@ static int _start_timewarp_server(char *port, int *pipefd) {
   return 0;
 }
 
-int start_timewarp_server(char *port, int *pipefd) {
 
-  pid_t cpid;
-  char buf;
+int start_timewarp_ctrl_server(char *port, int *pipefd) {
 
-  pipe(pipefd);
-  cpid = fork();
+  pid_t child_pid;
+
+  int sck, client;
+  size_t addrlen;
+  struct sockaddr_in this_addr, peer_addr;
+
+  int sock_fd = open_server_socket(port);
+
+  /**
   if (cpid == 0) {
     // child
     close(pipefd[0]); // close read-end of the pipe
@@ -215,8 +223,108 @@ int start_timewarp_server(char *port, int *pipefd) {
     close(pipefd[1]); // close the write-end of the pipe, thus sending EOF to the reader
     fcntl(pipefd[0], F_SETFL, O_NONBLOCK); // non blocking beauty
   }
+   **/
+
+  FATAL("Not implemented yet");
   return 0;
+
 }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+/*
+ * Block until we got a connection on the I/O port
+ */
+
+int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
+  int new_fd = 0;
+
+  struct addrinfo hints, *servinfo, *p;
+  struct sockaddr_storage their_addr; // connector's address information
+  socklen_t sin_size;
+  struct sigaction sa;
+  int yes = 1;
+  char s[INET6_ADDRSTRLEN];
+  int rv;
+
+  ssize_t len1, len2;
+
+  char buf[4096];
+
+  int server_fd = open_server_socket(port);
+
+  SAYF("Waiting for connection to stdin/stdout socket on port %s", port);
+
+  sin_size = sizeof their_addr;
+  int sock_fd = accept(server_fd, (struct sockaddr *) &their_addr, &sin_size);
+  if (sock_fd < 0) PFATAL("Error accepting client");
+
+  inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
+  printf("timewarp: accepted new client: %s\n", s);
+
+  close(server_fd); // Already got a connection to this one. :)
+
+
+  // Spawn our kids.
+  int cin = fork();
+  if (cin < 1) FATAL("Fork failed");
+
+  if (cin) {
+
+    close(stdio[1]);
+    if (stdio2) close(stdio2[1]);
+
+    while(1) {
+
+      len1 = (size_t) read(sock_fd, buf, sizeof(buf));
+      if (len1 < 1) PFATAL("Error occurred reading stdio input from socket");
+
+      len2 = write(stdio[0], buf, (size_t) len1);
+      if (len2 != len1) PFATAL("Only forwarded %ld of %ld to stdio pipe", len2, len1);
+
+      if (stdio2) {
+
+        len2 = write(stdio2[0], buf, (size_t) len1);
+        if (len2 != len1) PFATAL("Only forwarded %ld of %ld to stdio2 pipe", len2, len1);
+
+      }
+    }
+  }
+
+  int cout = fork();
+  if (cout < 1) FATAL("Fork failed");
+
+  if (cout) {
+
+    close(stdio[0]);
+    if (stdio2) close(stdio2[0]);
+
+    while (1) {
+
+      len1 = read(stdio[1], buf, sizeof(buf));
+      if (len1 < 1) PFATAL("Error occured reading from stdio[1]");
+
+      len2 = write(sock_fd, buf, (size_t) len1);
+      if (len2 != len1) PFATAL("Only forwareded %ld of %ld to socket", len2, len1);
+
+      if (stdio2) {
+
+        len2 = write(stdio2[1], buf, (size_t) len1);
+        if (len2 != len1) PFATAL("Error writing stdout to sock, %ld of %ld written.", len2, len1);
+
+      }
+    }
+  }
+
+  return sock_fd;
+
+
+
+
+
+}
+#pragma clang diagnostic pop
+
 
 timewarp_stage get_last_action() { /*int in_pipe) { */
   timewarp_stage action;

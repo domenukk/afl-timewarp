@@ -20,7 +20,16 @@ typedef enum _timewarp_stage {
  * @param pipefd the pipe to forward socket data to
  * @return error code or 0 if successful
  */
-int start_timewarp_server(char *port, int* pipefd);
+int start_timewarp_ctrl_server(char *port, int *pipefd);
+
+/**
+ * IO to the timewarped process
+ * @param port the port
+ * @param stdio stdio[0] will include user input, child process output an errors should be redirected stdio[1]
+ * @param stdio_cpy if not NULL, stdio_cpy[0] will be filled with user input, stdio_cpy[1] with program output
+ * @return error codes if needed
+ */
+int start_timewarp_io_server(char *port, int *stdio, int *stdio_cpy);
 
 /**
  * Stringify a stage name
