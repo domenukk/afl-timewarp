@@ -7730,11 +7730,6 @@ static void run_to_timewarp(char** argv) {
   u8  res;
   s32 fd;
 
-  SAYF("Use the program for as long as you like, then start timewarp mode to learn or directly start fuzzing");
-  ACTF("Running to timewarp");
-
-  if (dumb_mode != 1 && !no_forkserver && !forksrv_pid)
-    init_forkserver(argv);
 
   u64 start_us, stop_us;
 
@@ -7742,50 +7737,31 @@ static void run_to_timewarp(char** argv) {
   u32 use_tmout = exec_tmout;
   u8* old_sn = stage_name;
 
-  /* Be a bit more generous about timeouts when resuming sessions, or when
-     trying to calibrate already-added finds. This helps avoid trouble due
-     to intermittent latency. */
 
-  if (!from_queue || resuming_fuzz)
-    use_tmout = MAX(exec_tmout + CAL_TMOUT_ADD,
-                    exec_tmout * CAL_TMOUT_PERC / 100);
 
-  q->cal_failed++;
-
-  stage_name = "calibration";
-  stage_max  = fast_cal ? 3 : CAL_CYCLES;
-
-  /* Make sure the forkserver is up before we do anything, and let's not
-     count its spin-up time toward binary calibration. */
+  SAYF("Use the program for as long as you like, then start timewarp mode to learn or directly start fuzzing");
+  ACTF("Running to timewarp");
 
   if (dumb_mode != 1 && !no_forkserver && !forksrv_pid)
     init_forkserver(argv);
 
-  if (q->exec_cksum) memcpy(first_trace, trace_bits, MAP_SIZE);
+  stage_name = "timewarp";
+  stage_max  = fast_cal ? 3 : CAL_CYCLES;
 
   start_us = get_cur_time_us();
 
-  for (stage_cur = 0; stage_cur < stage_max; stage_cur++) {
+  u32 cksum;
 
-    u32 cksum;
+  // TODO: Do something like:  write_to_testcase(use_mem, q->len);
 
-    if (!first_run && !(stage_cur % stats_update_freq)) show_stats();
+  u8 fault = run_target(argv, use_tmout);
 
-    write_to_testcase(use_mem, q->len);
+  /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
+     we want to bail out quickly. */
 
-    fault = run_target(argv, use_tmout);
+  // TODO if (stop_soon || fault != crash_mode) goto abort_calibration;
 
-    /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
-       we want to bail out quickly. */
-
-    if (stop_soon || fault != crash_mode) goto abort_calibration;
-
-    if (!dumb_mode && !stage_cur && !count_bytes(trace_bits)) {
-      fault = FAULT_NOINST;
-      goto abort_calibration;
-    }
-
-    cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+  cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
 
     if (q->exec_cksum != cksum) {
 

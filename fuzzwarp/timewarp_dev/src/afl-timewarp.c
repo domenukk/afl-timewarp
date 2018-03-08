@@ -247,8 +247,6 @@ int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
   char s[INET6_ADDRSTRLEN];
   int rv;
 
-  ssize_t len1, len2;
-
   char buf[4096];
 
   int server_fd = open_server_socket(port);
@@ -276,18 +274,13 @@ int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
 
     while(1) {
 
-      len1 = (size_t) read(sock_fd, buf, sizeof(buf));
+      ssize_t len1 = (size_t) read(sock_fd, buf, sizeof(buf));
       if (len1 < 1) PFATAL("Error occurred reading stdio input from socket");
 
-      len2 = write(stdio[0], buf, (size_t) len1);
-      if (len2 != len1) PFATAL("Only forwarded %ld of %ld to stdio pipe", len2, len1);
+      ck_write(stdio[0], buf, (size_t) len1, "stdio pipe");
 
-      if (stdio2) {
+      if (stdio2) ck_write(stdio2[0], buf, (size_t) len1, "stdio2 pipe");
 
-        len2 = write(stdio2[0], buf, (size_t) len1);
-        if (len2 != len1) PFATAL("Only forwarded %ld of %ld to stdio2 pipe", len2, len1);
-
-      }
     }
   }
 
@@ -301,26 +294,18 @@ int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
 
     while (1) {
 
-      len1 = read(stdio[1], buf, sizeof(buf));
-      if (len1 < 1) PFATAL("Error occured reading from stdio[1]");
+      ssize_t len1 = read(stdio[1], buf, sizeof(buf));
+      if (len1 < 1) PFATAL("reading from stdio[1]");
 
-      len2 = write(sock_fd, buf, (size_t) len1);
-      if (len2 != len1) PFATAL("Only forwareded %ld of %ld to socket", len2, len1);
+      ck_write(sock_fd, buf, (size_t) len1, "socket out");
 
-      if (stdio2) {
+      if (stdio2) ck_write(stdio2[1], buf, (size_t) len1, "stdout2 out");
 
-        len2 = write(stdio2[1], buf, (size_t) len1);
-        if (len2 != len1) PFATAL("Error writing stdout to sock, %ld of %ld written.", len2, len1);
-
-      }
     }
   }
 
+  // TODO: Close a lot
   return sock_fd;
-
-
-
-
 
 }
 #pragma clang diagnostic pop
