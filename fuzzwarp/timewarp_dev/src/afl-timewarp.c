@@ -326,7 +326,7 @@ int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
     fcntl(err_fd, F_SETFL, O_NONBLOCK);
     fcntl(sock_fd, F_SETFL, O_NONBLOCK);
 
-    int nfds = max(max(out_fd, err_fd), sock_fd);
+    int nfds = max(max(out_fd, err_fd), sock_fd) + 1;
 
     while (1) {
 
