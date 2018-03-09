@@ -5,7 +5,17 @@
 #ifndef FUZZWARP_AFL_TIMEWARP_H
 #define FUZZWARP_AFL_TIMEWARP_H
 
+#include <zconf.h>
+
 #ifdef TIMEWARP_MODE
+
+#define __NUM_ARGS__(...)  (sizeof((int[]){__VA_ARGS__})/sizeof(int))
+
+#define CLOSE_ALL(...) do{ \
+  close_all(__NUM_ARGS__(__VA_ARGS__), __VA_ARGS__); \
+} while(0)
+
+void close_all(size_t len, ...);
 
 typedef enum _timewarp_stage {
     STAGE_LEARN = 'L',
@@ -45,7 +55,6 @@ char *timewarp_stage_name(timewarp_stage stage);
 timewarp_stage get_last_action();
 
 void timewarp_tidy();
-
 
 #endif /* ^TIMEWARP_MODE */
 #endif /* ^FUZZWARP_AFL_TIMEWARP_H */

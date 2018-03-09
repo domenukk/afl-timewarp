@@ -345,4 +345,17 @@ char *timewarp_stage_name(timewarp_stage stage) {
   }
 }
 
+void close_all(size_t len, ...) {
+   {
+  va_list params;
+  va_start(params, len);
+  for (size_t i = 0; i < len; i++) {
+    printf("%d\n", va_arg(params, int));
+    //close(va_arg(params, int));
+  }
+  va_end(params);
+}
+
+}
+
 #endif /* ^TIMEWARP_MODE */

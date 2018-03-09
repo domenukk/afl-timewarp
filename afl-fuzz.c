@@ -132,6 +132,10 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
 EXP_ST u8  timewarp_mode;             /* Running in TimeWarp mode?        */
 
 static timewarp_stage warp_stage;     /* The stage TimeWarp is in atm     */
+
+static s32 stdout_fd,                 /* Persistent fd for child stdout   */
+           stderr_fd;                 /* Persistent fd for child stderror */
+
 #endif /* ^TIMEWARP_MODE */
 
 static s32 out_fd,                    /* Persistent fd for out_file       */
@@ -2048,6 +2052,13 @@ EXP_ST void init_forkserver(char** argv) {
 #ifdef TIMEWARP_MODE
     if (timewarp_mode) {
       FATAL("TimeWarp not implemented yet");
+
+      dup2(out_fd, 0);
+      dup2(stdout_fd, 1);
+      dup2(stderr_fd, 2);
+
+      CLOSE_ALL(out_fd, stdout_fd, stderr_fd);
+
     } else {
 #endif /* ^TIMEWARP_MODE */
 
@@ -7755,6 +7766,7 @@ static void run_to_timewarp(char** argv) {
 
   /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
      we want to bail out quickly. */
+
 
   // TODO if (stop_soon || fault != crash_mode) goto abort_calibration;
 
