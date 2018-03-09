@@ -18,7 +18,7 @@ int main(int argc, int argv) {
         sleep(1);
     }
 
-    CLOSE_ALL(pipefd[1], pipefd[2]);
+    CLOSE_ALL(_P(pipefd));
 
     return 0;
 }

@@ -9,11 +9,25 @@
 
 #ifdef TIMEWARP_MODE
 
+/**
+ * Get amount of varargs
+ */
+
 #define __NUM_ARGS__(...)  (sizeof((int[]){__VA_ARGS__})/sizeof(int))
+
+/**
+ * Close a number of fds
+ */
 
 #define CLOSE_ALL(...) do{ \
   close_all(__NUM_ARGS__(__VA_ARGS__), __VA_ARGS__); \
 } while(0)
+
+/**
+ * DePipe it
+ */
+
+#define _P(pipe) (pipe)[1], (pipe)[2]
 
 void close_all(size_t len, ...);
 
