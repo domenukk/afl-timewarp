@@ -7,9 +7,6 @@
 #include "../../../debug.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -123,7 +120,7 @@ static int open_server_socket(char *port) {
   // loop through all the results and bind to the first we can
   for (p = servinfo; p != NULL; p = p->ai_next) {
     if ((sock_fd = socket(p->ai_family, p->ai_socktype,
-                         p->ai_protocol)) == -1) {
+                          p->ai_protocol)) == -1) {
       perror("server: socket");
       continue;
     }
@@ -230,13 +227,45 @@ int start_timewarp_ctrl_server(char *port, int *pipefd) {
 
 }
 
+/**
+ * Read data and write it to 2 file descriptors
+ * @param fd_from input file descriptor
+ * @param fd_to output file descriptor
+ * @param fd_to2 second output file descriptor or -1 if not set
+ */
+void forward_output(int fd_from, int fd_to, int fd_to2) {
+  int buf[4096];
+  // forward stdout to socket and err_fd2
+  ssize_t len1 = read(fd_from, buf, sizeof(buf));
+  if (len1 < 1) PFATAL("reading from fd");
+
+  ck_write(fd_to, buf, (size_t) len1, "writing to fd");
+
+  if (fd_to2 > -1) ck_write(fd_to2, buf, (size_t) len1, "wrtingn to stdout2");
+  // forward stderr to socket and err_fd2
+}
+
+static int max(int a, int b) {
+  return a > b ? a : b;
+}
+
+
+stdpipes create_stdpipes() {
+  stdpipes pipes = {0};
+  pipe(pipes.in);
+  pipe(pipes.out);
+  pipe(pipes.err);
+  return pipes;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
+
 /*
  * Block until we got a connection on the I/O port
  */
 
-int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
+int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
   int new_fd = 0;
 
   struct addrinfo hints, *servinfo, *p;
@@ -262,52 +291,100 @@ int start_timewarp_io_server(char *port, int *stdio, int *stdio2) {
 
   close(server_fd); // Already got a connection to this one. :)
 
+  int child = fork();
+  if (child < 0) FATAL("Fork failed");
 
-  // Spawn our kids.
-  int cin = fork();
-  if (cin < 1) FATAL("Fork failed");
+  if (child) {
 
-  if (cin) {
+    // Thread forward the traffic.
 
-    close(stdio[1]);
-    if (stdio2) close(stdio2[1]);
+    CLOSE_ALL(
+        _R(stdio->in),
+        _W(stdio->out),
+        _W(stdio->err)
+    );
 
-    while(1) {
-
-      ssize_t len1 = (size_t) read(sock_fd, buf, sizeof(buf));
-      if (len1 < 1) PFATAL("Error occurred reading stdio input from socket");
-
-      ck_write(stdio[0], buf, (size_t) len1, "stdio pipe");
-
-      if (stdio2) ck_write(stdio2[0], buf, (size_t) len1, "stdio2 pipe");
-
+    if (stdio2) {
+      CLOSE_ALL(
+          _R(stdio2->in),
+          _R(stdio2->out),
+          _R(stdio2->err)
+      );
     }
-  }
 
-  int cout = fork();
-  if (cout < 1) FATAL("Fork failed");
 
-  if (cout) {
+    int in_fd = _W(stdio->in);
+    int in_fd2 = stdio2 ? _W(stdio2->in) : -1;
 
-    close(stdio[0]);
-    if (stdio2) close(stdio2[0]);
+    int out_fd = _R(stdio->out);
+    int err_fd = _R(stdio->err);
+
+    int out_fd2 = stdio2 ? _W(stdio2->out) : -1;
+    int err_fd2 = stdio2 ? _W(stdio2->err) : -1;
+
+    fcntl(out_fd, F_SETFL, O_NONBLOCK);
+    fcntl(err_fd, F_SETFL, O_NONBLOCK);
+    fcntl(sock_fd, F_SETFL, O_NONBLOCK);
+
+    int nfds = max(max(out_fd, err_fd), sock_fd);
 
     while (1) {
 
-      ssize_t len1 = read(stdio[1], buf, sizeof(buf));
-      if (len1 < 1) PFATAL("reading from stdio[1]");
+      fd_set readfds;
+      FD_ZERO(&readfds);
+      FD_SET(out_fd, &readfds);
+      FD_SET(err_fd, &readfds);
+      FD_SET(sock_fd, &readfds);
 
-      ck_write(sock_fd, buf, (size_t) len1, "socket out");
+      int ret = select(nfds, &readfds, NULL, NULL, NULL);
+      if (ret == -1) PFATAL("select()");
 
-      if (stdio2) ck_write(stdio2[1], buf, (size_t) len1, "stdout2 out");
+      // Read from socket, write to both
+      if (FD_ISSET(sock_fd, &readfds)) {
+
+        forward_output(sock_fd, in_fd, in_fd2);
+
+      }
+
+      // Read from fd, write to socket and fd2
+      if (FD_ISSET(out_fd, &readfds)) {
+
+        forward_output(out_fd, sock_fd, out_fd2);
+
+      }
+
+      // Read from fd, write to socket and fd2
+      if (FD_ISSET(err_fd, &readfds)) {
+
+        forward_output(err_fd, sock_fd, err_fd2);
+
+      }
 
     }
+
+    ABORT("We left an endless loop?");
   }
 
-  // TODO: Close a lot
+
+  CLOSE_ALL(
+      _W(stdio->in),
+      _R(stdio->out),
+      _R(stdio->err),
+      sock_fd
+  );
+
+  if (stdio2) {
+    CLOSE_ALL(
+        _W(stdio2->in),
+        _W(stdio2->out),
+        _W(stdio2->err)
+    );
+  }
+
   return sock_fd;
 
 }
+
 #pragma clang diagnostic pop
 
 
@@ -346,16 +423,16 @@ char *timewarp_stage_name(timewarp_stage stage) {
 }
 
 void close_all(size_t len, ...) {
-   {
+
   va_list params;
   va_start(params, len);
-  for (size_t i = 0; i < len; i++) {
-    printf("%d\n", va_arg(params, int));
-    //close(va_arg(params, int));
-  }
-  va_end(params);
-}
 
+  for (size_t i = 0; i < len; i++) {
+    //printf("%d\n", va_arg(params, int));
+    close(va_arg(params, int));
+  }
+
+  va_end(params);
 }
 
 #endif /* ^TIMEWARP_MODE */

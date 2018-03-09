@@ -29,6 +29,28 @@
 
 #define _P(pipe) (pipe)[1], (pipe)[2]
 
+/**
+ * DePipe standardin/out
+ */
+
+#define _IN(stdio) _P((stdio).in)
+#define _OUT(stdio) _P((stdio).out), _P((stdio).err)
+#define _ALL(stdio) _IN(stdio), _OUT(stdio)
+
+/**
+ * The correct fds for reading and writing pipes
+ */
+
+#define _R(pipe) (pipe)[0]
+#define _W(pipe) (pipe)[1]
+
+
+/**
+ * Closes up to len sockets
+ * @param len the length
+ * @param ...
+ */
+
 void close_all(size_t len, ...);
 
 typedef enum _timewarp_stage {
@@ -37,6 +59,12 @@ typedef enum _timewarp_stage {
     STAGE_FUZZ = 'F',
     STAGE_QUIT = 'Q'
 } timewarp_stage;
+
+typedef struct _stdpipes {
+  int in[2];
+  int out[2];
+  int err[2];
+} stdpipes;
 
 /**
  * Initiates and starts the timewarp server, handling stdin over socket
@@ -53,7 +81,7 @@ int start_timewarp_ctrl_server(char *port, int *pipefd);
  * @param stdio_cpy if not NULL, stdio_cpy[0] will be filled with user input, stdio_cpy[1] with program output
  * @return error codes if needed
  */
-int start_timewarp_io_server(char *port, int *stdio, int *stdio_cpy);
+int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_cpy);
 
 /**
  * Stringify a stage name
@@ -67,6 +95,12 @@ char *timewarp_stage_name(timewarp_stage stage);
  * @return
  */
 timewarp_stage get_last_action();
+
+/**
+ * Creates a bunch of pipes and opens them
+ * @return stdpipes with opened in, out and err members.
+ */
+stdpipes create_stdpipes();
 
 void timewarp_tidy();
 

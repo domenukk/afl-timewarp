@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <memory.h>
+#include <kdefakes.h>
 #include "afl-timewarp.h"
 
 #define PORT "8081"
@@ -8,8 +10,31 @@
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 int main(int argc, int argv) {
   printf("starting.");
-    int pipefd[2];
+  stdpipes stdio1 = create_stdpipes();
+  stdpipes stdio2 = create_stdpipes();
+  int ret = start_timewarp_io_server(PORT, &stdio1, &stdio2);
 
+  char buf[4096];
+  buf[sizeof(buf) -1] = '\0';
+
+  strcpy(buf, "Hello Server");
+
+  while(1) {
+
+    write(_W(stdio1.out), buf, strlen(buf));
+
+    ssize_t len = read(_R(stdio1.in), buf, sizeof(buf) - 1);
+    if (len <= 0) {
+      printf("Broken foo");
+      return 1;
+    }
+    printf("%s\n", buf);
+
+  }
+
+  return 0;
+
+/*
     int ret = start_timewarp_ctrl_server(PORT, pipefd);
     printf("Started on port %s, ret: %d\n", PORT, ret);
 
@@ -19,6 +44,7 @@ int main(int argc, int argv) {
     }
 
     CLOSE_ALL(_P(pipefd));
+    */
 
     return 0;
 }

@@ -7,7 +7,7 @@ add_definitions(-DTIMEWARP_MODE)
 add_definitions(-DPREFIX=".")
 add_definitions(-DHELPER_PATH="./lib/afl")
 add_definitions(-DBIN_PATH="./bin")
-add_definitions(-DVERSION="fuzzwarp")
+#add_definitions(-DVERSION="fuzzwarp")
 
 add_definitions(-DAFL_PATH="./lib/afl")
 add_definitions(-DHELPER_PATH="./lib/afl")
