@@ -21,15 +21,15 @@ int main(int argc, int argv) {
   /* Isolate the process and configure standard descriptors. If out_file is
      specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
 
-  setsid();
+  //setsid();
 
   // start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
 
   start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
-  dup2(_R(stdio_tap.in), 0);
-  dup2(_W(stdio_tap.out), 1);
-  dup2(_W(stdio_tap.err), 2);
+  dup2(_R(stdio.in), 0);
+  dup2(_W(stdio.out), 1);
+  dup2(_W(stdio.err), 2);
 
   CLOSE_ALL(
       _R(stdio_tap.in),
