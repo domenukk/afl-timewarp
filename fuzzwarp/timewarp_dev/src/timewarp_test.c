@@ -32,12 +32,15 @@ int main(int argc, int argv) {
   dup2(_W(stdio.err), 2);
 
   CLOSE_ALL(
-      _R(stdio_tap.in),
+      _W(stdio_tap.in),
       _W(stdio_tap.out),
       _W(stdio_tap.err)
   );
 
+  // Insert afl process here
+
   execv("./reviveme", NULL);
+
   return 0;
 
 }

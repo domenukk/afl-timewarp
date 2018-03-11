@@ -2086,14 +2086,14 @@ EXP_ST void init_forkserver(char** argv) {
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
-      dup2(_R(stdio_tap.in), 0);
-      dup2(_W(stdio_tap.out), 1);
-      dup2(_W(stdio_tap.err), 2);
+      dup2(_R(stdio.in), 0);
+      dup2(_W(stdio.out), 1);
+      dup2(_W(stdio.err), 2);
 
       CLOSE_ALL(
-        _R(stdio_tap.in),
-        _W(stdio_tap.out),
-        _W(stdio_tap.err)
+          _W(stdio_tap.in),
+          _W(stdio_tap.out),
+          _W(stdio_tap.err)
       );
 
     } else {
