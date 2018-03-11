@@ -4,14 +4,46 @@
 #include <kdefakes.h>
 #include "afl-timewarp.h"
 
-#define PORT "8081"
+#define PORT "2800"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 int main(int argc, int argv) {
   printf("starting.");
-  stdpipes stdio1 = create_stdpipes();
-  stdpipes stdio2 = create_stdpipes();
+  stdpipes stdio = create_stdpipes();
+  stdpipes stdio_tap = create_stdpipes();
+
+  char *stdio_srv_port = PORT;
+
+  /* Umpf. On OpenBSD, the default fd limit for root users is set to
+     soft 128. Let's try to fix that... */
+
+  /* Isolate the process and configure standard descriptors. If out_file is
+     specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
+
+  setsid();
+
+  // start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
+
+  start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
+
+  dup2(_R(stdio_tap.in), 0);
+  dup2(_W(stdio_tap.out), 1);
+  dup2(_W(stdio_tap.err), 2);
+
+  CLOSE_ALL(
+      _R(stdio_tap.in),
+      _W(stdio_tap.out),
+      _W(stdio_tap.err)
+  );
+
+  execv("./reviveme", NULL);
+  return 0;
+
+}
+
+
+      /*
   int ret = start_timewarp_io_server(PORT, &stdio1, &stdio2);
 
   char buf[4096];
@@ -36,6 +68,7 @@ int main(int argc, int argv) {
   }
 
   return 0;
+       */
 
 /*
     int ret = start_timewarp_cnc_server(PORT, pipefd);
@@ -49,6 +82,4 @@ int main(int argc, int argv) {
     CLOSE_ALL(_P(pipefd));
     */
 
-    return 0;
-}
 #pragma clang diagnostic pop

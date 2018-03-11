@@ -36,7 +36,7 @@
 
 /* Comment out to disable fancy ANSI boxes and use poor man's 7-bit UI: */
 
-#define FANCY_BOXES
+//TODO: #define FANCY_BOXES
 
 /* Default timeout for fuzzed code (milliseconds). This is the upper bound,
    also used for detecting hangs; the actual value is auto-scaled: */

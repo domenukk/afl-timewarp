@@ -2082,7 +2082,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (timewarp_mode) {
 
-      start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
+      // start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
@@ -3499,7 +3499,11 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
              "exec_timeout      : %u\n"
              "afl_banner        : %s\n"
              "afl_version       : " VERSION "\n"
-             "target_mode       : %s%s%s%s%s%s%s\n"
+#ifdef TIMEWARP_MODE
+              "target_mode       : %s%s%s%s%s%s%s%s\n"
+#else
+              "target_mode       : %s%s%s%s%s%s%s\n"
+#endif /* ^TIMEWARP_MODE */
              "command_line      : %s\n",
              start_time / 1000, get_cur_time() / 1000, getpid(),
              queue_cycle ? (queue_cycle - 1) : 0, total_execs, eps,
@@ -3510,6 +3514,9 @@ static void write_stats_file(double bitmap_cvg, double stability, double eps) {
              last_hang_time / 1000, total_execs - last_crash_execs,
              exec_tmout, use_banner,
              qemu_mode ? "qemu " : "", dumb_mode ? " dumb " : "",
+#ifdef TIMEWARP_MODE
+             timewarp_mode ? "timewarp ": "",
+#endif /* TIMEWARP_MODE */
              no_forkserver ? "no_forksrv " : "", crash_mode ? "crash " : "",
              persistent_mode ? "persistent " : "", deferred_mode ? "deferred " : "",
              (qemu_mode || dumb_mode || no_forkserver || crash_mode ||
@@ -8212,7 +8219,7 @@ int main(int argc, char** argv) {
 #ifdef TIMEWARP_MODE
   if (timewarp_mode) {
 
-    run_to_timewarp(argv);
+    run_to_timewarp(use_argv);
 
     if (stop_soon) goto stop_fuzzing;
     if (warp_stage == STAGE_TIMEWARP) {

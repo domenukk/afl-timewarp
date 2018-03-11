@@ -202,7 +202,7 @@ static int _start_timewarp_server(char *port, int *pipefd) {
 
     int child_pid = 0;
     if (!(child_pid = fork())) { // this is the child process
-      close(sockfd); // child doesn't need the listener
+      //TODO: ?? close(sockfd); // child doesn't need the listener
 
       child_handle_input(new_fd, pipefd, child_pid);
 
@@ -224,14 +224,14 @@ static int _start_timewarp_server(char *port, int *pipefd) {
  * @param fd_to2 second output file descriptor or -1 if not set
  */
 void forward_output(int fd_from, int fd_to, int fd_to2) {
-  int buf[4096];
+  u8 buf[4096];
   // forward stdout to socket and err_fd2
   ssize_t len1 = read(fd_from, buf, sizeof(buf));
-  if (len1 < 1) PFATAL("reading from fd");
+  if (len1 < 0) PFATAL("reading from fd"); //TODO: Why can this be 0?
 
   ck_write(fd_to, buf, (size_t) len1, "writing to fd");
 
-  if (fd_to2 > -1) ck_write(fd_to2, buf, (size_t) len1, "wrtingn to stdout2");
+  if (fd_to2 > -1) ck_write(fd_to2, buf, (size_t) len1, "Forwarding from fd");
   // forward stderr to socket and err_fd2
 }
 
@@ -269,7 +269,7 @@ int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio2)  {
   if (child < 0) FATAL("Fork failed");
 
   if (child) {
-
+printf("timewrap: Parent process");
     // Thread forward the traffic.
 
     CLOSE_ALL(
@@ -295,9 +295,9 @@ int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio2)  {
     int out_fd2 = stdio2 ? _W(stdio2->out) : -1;
     int err_fd2 = stdio2 ? _W(stdio2->err) : -1;
 
-    fcntl(out_fd, F_SETFL, O_NONBLOCK);
-    fcntl(err_fd, F_SETFL, O_NONBLOCK);
-    fcntl(sock_fd, F_SETFL, O_NONBLOCK);
+    //fcntl(out_fd, F_SETFL, O_NONBLOCK);
+    //fcntl(err_fd, F_SETFL, O_NONBLOCK);
+    //fcntl(sock_fd, F_SETFL, O_NONBLOCK);
 
     // select needs the max file descriptor + 1
     int nfds = max(max(out_fd, err_fd), sock_fd) + 1;
