@@ -6,8 +6,11 @@
 #define FUZZWARP_AFL_TIMEWARP_H
 
 #include <zconf.h>
+#include <stdio.h>
 
 #ifdef TIMEWARP_MODE
+
+#define MAX_CNC_LINE_LENGTH 4096         /* Longer lines will be ignored for CNC */
 
 /**
  * Get amount of varargs
@@ -44,6 +47,7 @@
 #define _R(pipe) (pipe)[0]
 #define _W(pipe) (pipe)[1]
 
+int fdprintf(int fd, const char *format, ...);
 
 /**
  * Closes up to len sockets
@@ -54,10 +58,10 @@
 void close_all(size_t len, ...);
 
 typedef enum _timewarp_stage {
-    STAGE_LEARN = 'L',
-    STAGE_TIMEWARP = 'W',
-    STAGE_FUZZ = 'F',
-    STAGE_QUIT = 'Q'
+  STAGE_LEARN = 'L',
+  STAGE_TIMEWARP = 'W',
+  STAGE_FUZZ = 'F',
+  STAGE_QUIT = 'Q'
 } timewarp_stage;
 
 typedef struct _stdpipes {
@@ -72,7 +76,7 @@ typedef struct _stdpipes {
  * @param pipefd the pipe to forward socket data to
  * @return error code or 0 if successful
  */
-int start_timewarp_ctrl_server(char *port, int *pipefd);
+int start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap);
 
 /**
  * IO to the timewarped process
@@ -81,7 +85,7 @@ int start_timewarp_ctrl_server(char *port, int *pipefd);
  * @param stdio_cpy if not NULL, stdio_cpy[0] will be filled with user input, stdio_cpy[1] with program output
  * @return error codes if needed
  */
-int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_cpy);
+int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *cncio_tap);
 
 /**
  * Stringify a stage name

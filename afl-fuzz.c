@@ -131,7 +131,15 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
 #ifdef TIMEWARP_MODE
 EXP_ST u8  timewarp_mode;             /* Running in TimeWarp mode?        */
 
-static timewarp_stage warp_stage;     /* The stage TimeWarp is in atm     */
+timewarp_stage warp_stage;            /* The stage TimeWarp is in atm     */
+
+stdpipes stdio = {0};                 /* Pipes used for stdio redirection */
+stdpipes stdio_tap = {0};             /* Pipe to access stdio from        */
+stdpipes cncio = {0};                 /* The CnC pipe. Remote control AF1 */
+
+//TODO: PARAMS
+u8* stdio_srv_port = "2800";          /* Server port for stdio            */
+u8* cnc_srv_port = "2801";            /* Server port for CnC              */
 
 static s32 stdout_fd,                 /* Persistent fd for child stdout   */
            stderr_fd;                 /* Persistent fd for child stderror */
@@ -1978,6 +1986,27 @@ static void destroy_extras(void) {
 
 }
 
+EXP_ST void tw_start_fuzz() {
+
+  // TODO: More. For sure.
+
+  dup2(dev_null_fd, 1);
+  dup2(dev_null_fd, 2);
+
+  if (out_file) {
+
+    dup2(dev_null_fd, 0);
+
+  } else {
+
+    dup2(out_fd, 0);
+    close(out_fd);
+
+  }
+
+}
+
+
 
 /* Spin up fork server (instrumented mode only). The idea is explained here:
 
@@ -2050,16 +2079,25 @@ EXP_ST void init_forkserver(char** argv) {
     setsid();
 
 #ifdef TIMEWARP_MODE
+
     if (timewarp_mode) {
-      FATAL("TimeWarp not implemented yet");
 
-      dup2(out_fd, 0);
-      dup2(stdout_fd, 1);
-      dup2(stderr_fd, 2);
+      start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
 
-      CLOSE_ALL(out_fd, stdout_fd, stderr_fd);
+      start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
+
+      dup2(_R(stdio_tap.in), 0);
+      dup2(_W(stdio_tap.out), 1);
+      dup2(_W(stdio_tap.err), 2);
+
+      CLOSE_ALL(
+        _R(stdio_tap.in),
+        _W(stdio_tap.out),
+        _W(stdio_tap.err)
+      );
 
     } else {
+
 #endif /* ^TIMEWARP_MODE */
 
       dup2(dev_null_fd, 1);
@@ -7092,6 +7130,9 @@ static void usage(u8* argv0) {
 
        "  -d            - quick & dirty mode (skips deterministic steps)\n"
        "  -n            - fuzz without instrumentation (dumb mode)\n"
+#ifdef TIMEWARP_MODE
+       "  -W            - run in timewarp mode (see README)\n" // TODO: README
+#endif /* ^TIMEWARP_MODE */
        "  -x dir        - optional fuzzer dictionary (see README)\n\n"
 
        "Other stuff:\n\n"
@@ -7747,15 +7788,72 @@ static void run_to_timewarp(char** argv) {
   u32 use_tmout = exec_tmout;
   u8* old_sn = stage_name;
 
+  u8 buf[MAX_CNC_LINE_LENGTH + 1] = {0};
+
+  u8 illegal = 0; /* no \n in last buffer. Drop till \n */
+
+  u8 *current = buf;
+  u8 *next = buf;
+
   SAYF("Use the program for as long as you like, then start timewarp mode to learn or directly start fuzzing");
   ACTF("Running to timewarp");
 
-  if (dumb_mode != 1 && !no_forkserver && !forksrv_pid)
-    init_forkserver(argv);
-
   stage_name = "timewarp";
+
+  init_forkserver(argv);
+
   stage_max  = fast_cal ? 3 : CAL_CYCLES;
 
+  warp_stage = STAGE_TIMEWARP;
+
+  while (warp_stage == STAGE_TIMEWARP) {
+
+    ssize_t len = read(_R(cncio.in), current, sizeof(buf) - (current - buf) - 2);
+    if (len < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
+
+    if (illegal) {
+      current = strchr(buf, '\n');
+      if (current = NULL) {
+        current = buf;
+        continue;
+      }
+      illegal = 0;
+    }
+
+    next = strchr(current, '\n');
+    if (next == NULL) {
+      if (current == buf) {
+        fdprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
+        illegal = 1;
+        continue;
+      }
+
+      memmove(buf, current, current - buf);
+      continue;
+
+    }
+    if (next == buf) {
+      memmove(buf, buf + 1, sizeof(buf));
+      continue;
+    }
+
+    next[0] = '\0';
+
+    if (buf[0] == 'F') {
+      fdprintf(_W(cncio.out), "Starting to fuzz.");
+      warp_stage = STAGE_FUZZ;
+      // TODO: stdio foo.
+      break;
+    }
+    // TODO: Handle other actions
+
+
+  }
+
+  ABORT("Should implement fuzzing now.");
+
+// TODO: fuzz afterwards
+  /*
   start_us = get_cur_time_us();
 
   u32 cksum;
@@ -7767,6 +7865,7 @@ static void run_to_timewarp(char** argv) {
   /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
      we want to bail out quickly. */
 
+  /*
 
   // TODO if (stop_soon || fault != crash_mode) goto abort_calibration;
 
@@ -7778,6 +7877,7 @@ static void run_to_timewarp(char** argv) {
   /* If this case didn't result in new output from the instrumentation, tell
      parent. This is a non-critical problem, but something to warn the user
      about. */
+
 
   if (stop_soon) return;
 
@@ -7821,7 +7921,12 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
+#ifdef TIMEWARP_MODE
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:QW")) > 0)
+#else
   while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q")) > 0)
+#endif /* ^TIMEWARP_MODE */
+
 
     switch (opt) {
 

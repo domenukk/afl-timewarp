@@ -19,6 +19,9 @@ int main(int argc, int argv) {
 
   strcpy(buf, "Hello Server");
 
+  fdprintf(_W(stdio1.out), "%s\n", buf);
+  return 1;
+
   while(1) {
 
     write(_W(stdio1.out), buf, strlen(buf));
@@ -35,7 +38,7 @@ int main(int argc, int argv) {
   return 0;
 
 /*
-    int ret = start_timewarp_ctrl_server(PORT, pipefd);
+    int ret = start_timewarp_cnc_server(PORT, pipefd);
     printf("Started on port %s, ret: %d\n", PORT, ret);
 
     while(1) {

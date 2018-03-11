@@ -6,7 +6,6 @@
 #include "afl-timewarp.h"
 #include "../../../debug.h"
 
-#include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,7 +15,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 
-#define BACKLOG 10   // how many pending connections queue will hold
+#define BACKLOG 10               /* how many pending connections queue will hold */
 
 void sigchld_handler(int s) {
   // waitpid() might overwrite errno, so we save and restore it:
@@ -26,6 +25,27 @@ void sigchld_handler(int s) {
 
   errno = saved_errno;
 }
+
+int fdprintf(int fd, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  int len = vsnprintf(NULL, 0, format, args);
+  va_end(args);
+  if (len < 1) ABORT("snprintf failed work.");
+
+  char buf[len + 1];
+
+  va_start(args, format);
+  len = vsnprintf(buf, sizeof(buf), format, args);
+  va_end(args);
+
+  if (len < 1) ABORT("snprintf failed work.");
+
+  ck_write(fd, buf, len, "Write Failed.");
+
+  return len;
+}
+
 
 /** get sockaddr, IPv4 or IPv6*/
 void *get_in_addr(struct sockaddr *sa) {
@@ -197,36 +217,6 @@ static int _start_timewarp_server(char *port, int *pipefd) {
 }
 
 
-int start_timewarp_ctrl_server(char *port, int *pipefd) {
-
-  pid_t child_pid;
-
-  int sck, client;
-  size_t addrlen;
-  struct sockaddr_in this_addr, peer_addr;
-
-  int sock_fd = open_server_socket(port);
-
-  /**
-  if (cpid == 0) {
-    // child
-    close(pipefd[0]); // close read-end of the pipe
-    _start_timewarp_server(port, pipefd);
-    // Never returns
-    fprintf(stderr, "Server loop exited; This point should never be reached.");
-    exit(1);
-  } else {
-
-    close(pipefd[1]); // close the write-end of the pipe, thus sending EOF to the reader
-    fcntl(pipefd[0], F_SETFL, O_NONBLOCK); // non blocking beauty
-  }
-   **/
-
-  FATAL("Not implemented yet");
-  return 0;
-
-}
-
 /**
  * Read data and write it to 2 file descriptors
  * @param fd_from input file descriptor
@@ -249,23 +239,8 @@ static int max(int a, int b) {
   return a > b ? a : b;
 }
 
-
-stdpipes create_stdpipes() {
-  stdpipes pipes = {0};
-  pipe(pipes.in);
-  pipe(pipes.out);
-  pipe(pipes.err);
-  return pipes;
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-
-/*
- * Block until we got a connection on the I/O port
- */
-
-int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
+int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio2)  {
+  // TODO: forking/allow reattach?
   int new_fd = 0;
 
   struct addrinfo hints, *servinfo, *p;
@@ -280,7 +255,6 @@ int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
 
   int server_fd = open_server_socket(port);
 
-  SAYF("Waiting for connection to stdin/stdout socket on port %s", port);
 
   sin_size = sizeof their_addr;
   int sock_fd = accept(server_fd, (struct sockaddr *) &their_addr, &sin_size);
@@ -312,7 +286,6 @@ int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
       );
     }
 
-
     int in_fd = _W(stdio->in);
     int in_fd2 = stdio2 ? _W(stdio2->in) : -1;
 
@@ -326,6 +299,7 @@ int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
     fcntl(err_fd, F_SETFL, O_NONBLOCK);
     fcntl(sock_fd, F_SETFL, O_NONBLOCK);
 
+    // select needs the max file descriptor + 1
     int nfds = max(max(out_fd, err_fd), sock_fd) + 1;
 
     while (1) {
@@ -382,6 +356,59 @@ int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio2) {
   }
 
   return sock_fd;
+
+}
+
+int start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap) {
+
+  pid_t child_pid;
+
+  int sck, client;
+  size_t addrlen;
+  struct sockaddr_in this_addr, peer_addr;
+
+  return start_tap_server(port, cncio, cncio_tap);
+
+  /**
+  if (cpid == 0) {
+    // child
+    close(pipefd[0]); // close read-end of the pipe
+    _start_timewarp_server(port, pipefd);
+    // Never returns
+    fprintf(stderr, "Server loop exited; This point should never be reached.");
+    exit(1);
+  } else {
+
+    close(pipefd[1]); // close the write-end of the pipe, thus sending EOF to the reader
+    fcntl(pipefd[0], F_SETFL, O_NONBLOCK); // non blocking beauty
+  }
+   **/
+
+  FATAL("Not implemented yet");
+  return 0;
+
+}
+
+
+stdpipes create_stdpipes() {
+  stdpipes pipes = {0};
+  pipe(pipes.in);
+  pipe(pipes.out);
+  pipe(pipes.err);
+  return pipes;
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
+
+/*
+ * Block until we got a connection on the I/O port
+ */
+
+int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *cncio_tap) {
+
+  SAYF("Waiting for connection to stdin/stdout socket on port %s", port);
+  return start_tap_server(port, stdio, cncio_tap);
 
 }
 

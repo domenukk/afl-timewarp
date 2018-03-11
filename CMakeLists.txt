@@ -28,7 +28,9 @@ add_executable(fuzzwarp
         debug.h
         hash.h
         types.h
-        fuzzwarp/timewarp_dev/src/afl-timewarp.h)
+        fuzzwarp/timewarp_dev/src/afl-timewarp.h
+        fuzzwarp/timewarp_dev/src/afl-timewarp.c
+        )
 
 add_executable(reviveme
         fuzzwarp/reviveme.c)
