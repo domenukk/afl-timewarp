@@ -2047,7 +2047,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (mem_limit) {
 
-      r.rlim_max = r.rlim_cur = ((rlim_t)mem_limit) << 20;
+      r.rlim_max = r.rlim_cur = ((rlim_t) mem_limit) << 20;
 
 #ifdef RLIMIT_AS
 
@@ -2086,15 +2086,17 @@ EXP_ST void init_forkserver(char** argv) {
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
-      dup2(_R(stdio.in), 0);
-      dup2(_W(stdio.out), 1);
-      dup2(_W(stdio.err), 2);
+      if (dup2(_R(stdio.in), 0) < 0) PFATAL("dup2 failed");
+      if (dup2(_W(stdio.out), 1) < 0) PFATAL("dup2 failed");
+      if (dup2(_W(stdio.err), 2) < 0) PFATAL("dup2 failed");
 
       CLOSE_ALL(
           _W(stdio_tap.in),
           _W(stdio_tap.out),
           _W(stdio_tap.err)
       );
+
+      //TODO: The stuff below needs to be done to start fuzzing.
 
     } else {
 
@@ -2129,10 +2131,18 @@ EXP_ST void init_forkserver(char** argv) {
     close(st_pipe[0]);
     close(st_pipe[1]);
 
-    close(out_dir_fd);
-    close(dev_null_fd);
-    close(dev_urandom_fd);
-    close(fileno(plot_file));
+#ifdef TIMEWARP_MODE
+    if (!timewarp_mode)
+#endif /* TIMEWARP_MODE */
+
+    {
+
+      close(out_dir_fd);
+      close(dev_null_fd);
+      close(dev_urandom_fd);
+      close(fileno(plot_file));
+
+    }
 
     /* This should improve performance a bit, since it stops the linker from
        doing extra work post-fork(). */
@@ -7814,7 +7824,9 @@ static void run_to_timewarp(char** argv) {
   warp_stage = STAGE_TIMEWARP;
 
   while (warp_stage == STAGE_TIMEWARP) {
-
+    sleep(10);
+  }
+/*
     ssize_t len = read(_R(cncio.in), current, sizeof(buf) - (current - buf) - 2);
     if (len < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
 
