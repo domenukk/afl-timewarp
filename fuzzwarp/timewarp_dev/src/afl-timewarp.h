@@ -47,8 +47,6 @@
 #define _R(pipe) (pipe)[0]
 #define _W(pipe) (pipe)[1]
 
-int fdprintf(int fd, const char *format, ...);
-
 /**
  * Closes up to len sockets
  * @param len the length
@@ -69,6 +67,9 @@ typedef struct _stdpipes {
   int out[2];
   int err[2];
 } stdpipes;
+
+
+void ck_dup2(int fd_new, int fd_old);
 
 /**
  * Initiates and starts the timewarp server, handling stdin over socket

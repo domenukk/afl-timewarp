@@ -7842,7 +7842,7 @@ static void run_to_timewarp(char** argv) {
     next = strchr(current, '\n');
     if (next == NULL) {
       if (current == buf) {
-        fdprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
+        dprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
         illegal = 1;
         continue;
       }
@@ -7859,7 +7859,7 @@ static void run_to_timewarp(char** argv) {
     next[0] = '\0';
 
     if (buf[0] == 'F') {
-      fdprintf(_W(cncio.out), "Starting to fuzz.");
+      dprintf(_W(cncio.out), "Starting to fuzz.");
       warp_stage = STAGE_FUZZ;
       // TODO: stdio foo.
       break;

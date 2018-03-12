@@ -17,7 +17,7 @@
 
 #define BACKLOG 10               /* how many pending connections queue will hold */
 
-void sigchld_handler(int s) {
+static void sigchld_handler(int s) {
   // waitpid() might overwrite errno, so we save and restore it:
   int saved_errno = errno;
 
@@ -26,29 +26,8 @@ void sigchld_handler(int s) {
   errno = saved_errno;
 }
 
-int fdprintf(int fd, const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-  int len = vsnprintf(NULL, 0, format, args);
-  va_end(args);
-  if (len < 1) ABORT("snprintf failed work.");
-
-  char buf[len + 1];
-
-  va_start(args, format);
-  len = vsnprintf(buf, sizeof(buf), format, args);
-  va_end(args);
-
-  if (len < 1) ABORT("snprintf failed work.");
-
-  ck_write(fd, buf, len, "Write Failed.");
-
-  return len;
-}
-
-
 /** get sockaddr, IPv4 or IPv6*/
-void *get_in_addr(struct sockaddr *sa) {
+static void *get_in_addr(struct sockaddr *sa) {
   if (sa->sa_family == AF_INET) {
     return &(((struct sockaddr_in *) sa)->sin_addr);
   }
@@ -163,10 +142,12 @@ static int open_server_socket(char *port) {
   if (!p) FATAL("server: failed to bind to port %s\n", port);
   if (listen(sock_fd, BACKLOG) == -1) PFATAL("Unable to listen on socket %s\n", port);
 
+  /*
   sa.sa_handler = sigchld_handler; // reap all dead processes
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART;
   if (sigaction(SIGCHLD, &sa, NULL) == -1) PFATAL("Error in sigaction ");
+  */
 
   SAYF("Started listening socket on port %s\n", port);
   return sock_fd;
@@ -223,38 +204,35 @@ static int _start_timewarp_server(char *port, int *pipefd) {
  * @param fd_to output file descriptor
  * @param fd_to2 second output file descriptor or -1 if not set
  */
-void forward_output(int fd_from, int fd_to, int fd_to2) {
+static void forward_output(int fd_from, int fd_to, int fd_to2) {
   u8 buf[4096];
   // forward stdout to socket and err_fd2
   ssize_t len1 = read(fd_from, buf, sizeof(buf));
-  if (len1 < 0) PFATAL("reading from fd"); //TODO: Why can this be 0?
+  if (len1 < 1) RPFATAL("reading from fd"); //TODO: Handle this less brutally
 
-  ck_write(fd_to, buf, (size_t) len1, "writing to fd");
+  ck_write(fd_to, buf, (size_t) len1, "Forwarding to fd");
 
-  if (fd_to2 > -1) ck_write(fd_to2, buf, (size_t) len1, "Forwarding from fd");
-  // forward stderr to socket and err_fd2
+  if (fd_to2 > -1) {
+    ck_write(fd_to2, buf, (size_t) len1, "Forwarding to tap");
+  }
+
 }
 
 static int max(int a, int b) {
   return a > b ? a : b;
 }
 
-int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio2)  {
+static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
+
   // TODO: forking/allow reattach?
-  int new_fd = 0;
 
   struct addrinfo hints, *servinfo, *p;
   struct sockaddr_storage their_addr; // connector's address information
   socklen_t sin_size;
   struct sigaction sa;
-  int yes = 1;
   char s[INET6_ADDRSTRLEN];
-  int rv;
-
-  char buf[4096];
 
   int server_fd = open_server_socket(port);
-
 
   sin_size = sizeof their_addr;
   int sock_fd = accept(server_fd, (struct sockaddr *) &their_addr, &sin_size);
@@ -268,9 +246,8 @@ int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio2)  {
   int child = fork();
   if (child < 0) FATAL("Fork failed");
 
-  if (child) {
-printf("timewrap: Parent process");
-    // Thread forward the traffic.
+  if (!child) {
+    // Thread forwarding the traffic.
 
     CLOSE_ALL(
         _R(stdio->in),
@@ -278,26 +255,22 @@ printf("timewrap: Parent process");
         _W(stdio->err)
     );
 
-    if (stdio2) {
+    if (stdio_tap) {
       CLOSE_ALL(
-          _R(stdio2->in),
-          _R(stdio2->out),
-          _R(stdio2->err)
+          _R(stdio_tap->in),
+          _R(stdio_tap->out),
+          _R(stdio_tap->err)
       );
     }
 
     int in_fd = _W(stdio->in);
-    int in_fd2 = stdio2 ? _W(stdio2->in) : -1;
+    int in_fd2 = stdio_tap ? _W(stdio_tap->in) : -1;
 
     int out_fd = _R(stdio->out);
     int err_fd = _R(stdio->err);
 
-    int out_fd2 = stdio2 ? _W(stdio2->out) : -1;
-    int err_fd2 = stdio2 ? _W(stdio2->err) : -1;
-
-    //fcntl(out_fd, F_SETFL, O_NONBLOCK);
-    //fcntl(err_fd, F_SETFL, O_NONBLOCK);
-    //fcntl(sock_fd, F_SETFL, O_NONBLOCK);
+    int out_fd2 = stdio_tap ? _W(stdio_tap->out) : -1;
+    int err_fd2 = stdio_tap ? _W(stdio_tap->err) : -1;
 
     // select needs the max file descriptor + 1
     int nfds = max(max(out_fd, err_fd), sock_fd) + 1;
@@ -347,11 +320,11 @@ printf("timewrap: Parent process");
       sock_fd
   );
 
-  if (stdio2) {
+  if (stdio_tap) {
     CLOSE_ALL(
-        _W(stdio2->in),
-        _W(stdio2->out),
-        _W(stdio2->err)
+        _W(stdio_tap->in),
+        _W(stdio_tap->out),
+        _W(stdio_tap->err)
     );
   }
 
@@ -460,6 +433,10 @@ void close_all(size_t len, ...) {
   }
 
   va_end(params);
+}
+
+void ck_dup2(int fd_new, int fd_old) {
+  if (dup2(fd_new, fd_old) < 0) PFATAL("dup2 failed");
 }
 
 #endif /* ^TIMEWARP_MODE */
