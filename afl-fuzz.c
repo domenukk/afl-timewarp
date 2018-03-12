@@ -33,8 +33,8 @@
 #include "hash.h"
 
 #ifdef TIMEWARP_MODE
-#include "./fuzzwarp/timewarp_dev/src/afl-timewarp.h"
-#endif /* ^TIMEWARP_MODE */
+#include "fuzzwarp/afl-timewarp.h"
+#endif /* TIMEWARP_MODE */
 
 #include <stdio.h>
 #include <unistd.h>
@@ -144,7 +144,7 @@ u8* cnc_srv_port = "2801";            /* Server port for CnC              */
 static s32 stdout_fd,                 /* Persistent fd for child stdout   */
            stderr_fd;                 /* Persistent fd for child stderror */
 
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
 
 static s32 out_fd,                    /* Persistent fd for out_file       */
            dev_urandom_fd = -1,       /* Persistent fd for /dev/urandom   */
@@ -2086,9 +2086,9 @@ EXP_ST void init_forkserver(char** argv) {
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
-      if (dup2(_R(stdio.in), 0) < 0) PFATAL("dup2 failed");
-      if (dup2(_W(stdio.out), 1) < 0) PFATAL("dup2 failed");
-      if (dup2(_W(stdio.err), 2) < 0) PFATAL("dup2 failed");
+      ck_dup2(_R(stdio.in), 0);
+      ck_dup2(_W(stdio.out), 1);
+      ck_dup2(_W(stdio.err), 2);
 
       CLOSE_ALL(
           _W(stdio_tap.in),
@@ -2096,11 +2096,13 @@ EXP_ST void init_forkserver(char** argv) {
           _W(stdio_tap.err)
       );
 
+      ck_write(st_pipe[1], "up!", 4, "write failed, did the parent die?");
+
       //TODO: The stuff below needs to be done to start fuzzing.
 
-    } else {
-
-#endif /* ^TIMEWARP_MODE */
+    } else
+#endif /* TIMEWARP_MODE */
+    {
 
       dup2(dev_null_fd, 1);
       dup2(dev_null_fd, 2);
@@ -2116,10 +2118,7 @@ EXP_ST void init_forkserver(char** argv) {
 
       }
 
-#ifdef TIMEWARP_MODE
     }
-#endif /* ^TIMEWARP_MODE */
-
 
     /* Set up control and status pipes, close the unneeded original fds. */
 
@@ -2134,7 +2133,6 @@ EXP_ST void init_forkserver(char** argv) {
 #ifdef TIMEWARP_MODE
     if (!timewarp_mode)
 #endif /* TIMEWARP_MODE */
-
     {
 
       close(out_dir_fd);
@@ -2182,6 +2180,15 @@ EXP_ST void init_forkserver(char** argv) {
 
   fsrv_ctl_fd = ctl_pipe[1];
   fsrv_st_fd  = st_pipe[0];
+
+#ifdef TIMEWARP_MODE
+  if (timewarp_mode) {
+
+    /* Wait for connection process */
+    if (read(fsrv_st_fd, &status, 4) < 4) RPFATAL("RIP Child.");
+
+  }
+#endif /* TIMEWARP_MODE */
 
   /* Wait for the fork server to come up, but don't wait too long. */
 
@@ -8131,7 +8138,7 @@ int main(int argc, char** argv) {
         timewarp_mode = 1;
 
         break;
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
 
       default:
 
@@ -8176,7 +8183,7 @@ int main(int argc, char** argv) {
     if (out_file) FATAL("TimeWarp Mode (-W) can only be used to fuzz standard input. -W and -f are mutually exclusive");
     if (no_forkserver) FATAL("TimeWarp Mode (-W) and AFL_NO_FORKSRV are mutually exclusive");
   }
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
 
   if (getenv("AFL_PRELOAD")) {
     setenv("LD_PRELOAD", getenv("AFL_PRELOAD"), 1);
@@ -8238,7 +8245,7 @@ int main(int argc, char** argv) {
       timewarp();
     }
   }
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
 
   perform_dry_run(use_argv);
 

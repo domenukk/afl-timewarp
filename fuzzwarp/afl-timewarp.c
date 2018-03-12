@@ -4,7 +4,7 @@
 #ifdef TIMEWARP_MODE
 
 #include "afl-timewarp.h"
-#include "../../../debug.h"
+#include "../debug.h"
 
 #include <string.h>
 #include <sys/socket.h>
@@ -12,7 +12,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
-#include <fcntl.h>
+#include <sys/resource.h>
 #include <stdbool.h>
 
 #define BACKLOG 10               /* how many pending connections queue will hold */
@@ -26,27 +26,64 @@ static void sigchld_handler(int s) {
   errno = saved_errno;
 }
 
-/** get sockaddr, IPv4 or IPv6*/
-static void *get_in_addr(struct sockaddr *sa) {
-  if (sa->sa_family == AF_INET) {
-    return &(((struct sockaddr_in *) sa)->sin_addr);
+/**
+ * Rather dirty way to close all unneeded fds.
+ * @param count
+ * @param ... the fds. Will ignore negative values.
+ * @return the max count
+ */
+int close_others(int count, ...) {
+
+  int keep_fds[count];
+  int max_fd = 0;
+  int found_count = 0;
+  struct rlimit fd_limit;
+
+  int len = 0;
+  va_list params;
+
+  va_start(params, count);
+  for (int i = 0; i < count; i++) {
+
+    int fd = va_arg(params, int);
+    if (fd >= 0) {
+      keep_fds[len] = fd;
+      len++;
+    }
+
   }
-  return &(((struct sockaddr_in6 *) sa)->sin6_addr);
-}
+  va_end(params);
 
-/** Returns true on success, or false if there was an error */
-bool set_socket_blocking(int fd, bool blocking) {
-  if (fd < 0) return false;
+  if (getrlimit(RLIMIT_NOFILE, &fd_limit) < 0) PFATAL("getrlimit");
 
-#ifdef _WIN32
-  unsigned long mode = blocking ? 0 : 1;
-  return (ioctlsocket(fd, FIONBIO, &mode) == 0) ? true : false;
-#else
-  int flags = fcntl(fd, F_GETFL, 0);
-  if (flags < 0) return false;
-  flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-  return (fcntl(fd, F_SETFL, flags) == 0) ? true : false;
-#endif
+  for (int i = 0; i < fd_limit.rlim_cur - 1; i++) {
+
+    bool found = false;
+
+    if (found_count < len) {
+
+      for (int k = 0; k < len; k++) {
+
+        if ((keep_fds[k]) == i) {
+
+          found_count++;
+          found = true;
+          max_fd = i;
+          break;
+
+        }
+      }
+    }
+
+    if (!found) {
+
+      (void) close(i);
+
+    }
+  }
+
+  return max_fd;
+
 }
 
 static void writes(int socket_fd, char *s) {
@@ -55,42 +92,6 @@ static void writes(int socket_fd, char *s) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn" // Supposed to run forever.
-
-static void child_handle_input(int socket_fd, int *pipefd, int child_pid) {
-  dprintf(socket_fd, "%s\n%s\n%s\n%s\n%s\n",
-          "Welcome to AFL Timewarp.",
-          "Start learning with \"L\"",
-          "reset to L and accept current input as Fuzzer input using \"R\" (repeat this multiple times),",
-          "then start Fuzzing with \"F\",",
-          "exit with \"E\"."); // TODO: Payload or not?
-
-  char buf[512];
-  ssize_t received = 0;
-
-  //TODO: Replace with DUP2 and
-  while (1) {
-    // Parsing Type, Length, Value
-    received = recv(socket_fd, buf, sizeof(buf), 0);
-    if (!received) {
-      printf("Child %d finished receiving. Exiting.", child_pid);
-    }
-    for (int i = 0; i < received; i++) {
-      switch (buf[i]) {
-        // We don't really handle any of our known tokens differently for now; Maybe later.
-        case STAGE_LEARN:
-        case STAGE_TIMEWARP:
-        case STAGE_FUZZ:
-        case STAGE_QUIT:
-          // send this on to the parent's parent process write()
-          write(pipefd[1], &buf[i], 1);
-          break;
-        default:
-          break;
-      }
-    }
-    // fflush(pipefd[1]);
-  }
-}
 
 #pragma clang diagnostic pop
 
@@ -101,6 +102,7 @@ static void child_handle_input(int socket_fd, int *pipefd, int child_pid) {
  */
 
 static int open_server_socket(char *port) {
+
   int sock_fd = 0;
   struct addrinfo hints, *servinfo, *p;
   struct sockaddr_storage their_addr; // connector's address information
@@ -153,51 +155,6 @@ static int open_server_socket(char *port) {
   return sock_fd;
 }
 
-// This actually starts the cnc server after the initial process has been forked.
-static int _start_timewarp_server(char *port, int *pipefd) {
-
-  int new_fd = 0;
-  struct addrinfo hints, *servinfo, *p;
-  struct sockaddr_storage their_addr; // connector's address information
-  socklen_t sin_size;
-  struct sigaction sa;
-  int yes = 1;
-  char s[INET6_ADDRSTRLEN];
-  int rv;
-
-  int sockfd = open_server_socket(port);
-
-  printf("server: waiting for connection on Port %s...\n", port);
-
-  while (1) {
-
-    sin_size = sizeof their_addr;
-    new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size);
-    if (new_fd == -1) {
-      perror("accept");
-      continue;
-    }
-
-    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
-    printf("timewarp: accepted new client: %s\n", s);
-
-    int child_pid = 0;
-    if (!(child_pid = fork())) { // this is the child process
-      //TODO: ?? close(sockfd); // child doesn't need the listener
-
-      child_handle_input(new_fd, pipefd, child_pid);
-
-      /* never returns */
-      close(new_fd);
-      close(pipefd[1]);
-      exit(0);
-    }
-    close(new_fd);  // parent doesn't need this
-  }
-  return 0;
-}
-
-
 /**
  * Read data and write it to 2 file descriptors
  * @param fd_from input file descriptor
@@ -205,6 +162,7 @@ static int _start_timewarp_server(char *port, int *pipefd) {
  * @param fd_to2 second output file descriptor or -1 if not set
  */
 static void forward_output(int fd_from, int fd_to, int fd_to2) {
+
   u8 buf[4096];
   // forward stdout to socket and err_fd2
   ssize_t len1 = read(fd_from, buf, sizeof(buf));
@@ -218,28 +176,39 @@ static void forward_output(int fd_from, int fd_to, int fd_to2) {
 
 }
 
-static int max(int a, int b) {
-  return a > b ? a : b;
+void open_stdpipes(stdpipes *pipes) {
+  if (pipe(pipes->in) | pipe(pipes->out) | pipe(pipes->err)) {
+    PFATAL("Pipe failed");
+  }
 }
 
-static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
+static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
+
+  open_stdpipes(stdio);
+  open_stdpipes(stdio_tap);
 
   // TODO: forking/allow reattach?
 
-  struct addrinfo hints, *servinfo, *p;
-  struct sockaddr_storage their_addr; // connector's address information
+  struct sockaddr_storage their_addr_storage; // connector's address information
+  struct sockaddr *their_addr = (struct sockaddr *) &their_addr_storage;
+  struct sockaddr_in *their_addr4 = (struct sockaddr_in *) their_addr;
+  struct sockaddr_in6 *their_addr6 = (struct sockaddr_in6 *) their_addr;
+
   socklen_t sin_size;
-  struct sigaction sa;
   char s[INET6_ADDRSTRLEN];
 
   int server_fd = open_server_socket(port);
 
-  sin_size = sizeof their_addr;
-  int sock_fd = accept(server_fd, (struct sockaddr *) &their_addr, &sin_size);
+  sin_size = sizeof their_addr_storage;
+  int sock_fd = accept(server_fd, their_addr, &sin_size);
   if (sock_fd < 0) PFATAL("Error accepting client");
 
-  inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *) &their_addr), s, sizeof s);
-  printf("timewarp: accepted new client: %s\n", s);
+  void *sin_addr =
+      their_addr->sa_family == AF_INET ? (void *) &their_addr4->sin_addr : (void *) &their_addr6->sin6_addr;
+
+  inet_ntop(their_addr_storage.ss_family, sin_addr, s, sizeof s);
+
+  SAYF("TimeWarp accepted new Client on port %s\n", s);
 
   close(server_fd); // Already got a connection to this one. :)
 
@@ -248,20 +217,6 @@ static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
 
   if (!child) {
     // Thread forwarding the traffic.
-
-    CLOSE_ALL(
-        _R(stdio->in),
-        _W(stdio->out),
-        _W(stdio->err)
-    );
-
-    if (stdio_tap) {
-      CLOSE_ALL(
-          _R(stdio_tap->in),
-          _R(stdio_tap->out),
-          _R(stdio_tap->err)
-      );
-    }
 
     int in_fd = _W(stdio->in);
     int in_fd2 = stdio_tap ? _W(stdio_tap->in) : -1;
@@ -272,8 +227,15 @@ static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
     int out_fd2 = stdio_tap ? _W(stdio_tap->out) : -1;
     int err_fd2 = stdio_tap ? _W(stdio_tap->err) : -1;
 
-    // select needs the max file descriptor + 1
-    int nfds = max(max(out_fd, err_fd), sock_fd) + 1;
+    int max_fd = CLOSE_OTHERS(
+        in_fd,
+        in_fd2,
+        out_fd,
+        out_fd2,
+        err_fd,
+        err_fd2,
+        sock_fd
+    );
 
     while (1) {
 
@@ -283,7 +245,7 @@ static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
       FD_SET(err_fd, &readfds);
       FD_SET(sock_fd, &readfds);
 
-      int ret = select(nfds, &readfds, NULL, NULL, NULL);
+      int ret = select(max_fd + 1, &readfds, NULL, NULL, NULL);
       if (ret == -1) PFATAL("select()");
 
       // Read from socket, write to both
@@ -327,20 +289,19 @@ static int start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap)  {
         _W(stdio_tap->err)
     );
   }
-
-  return sock_fd;
-
 }
 
-int start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap) {
 
-  pid_t child_pid;
+void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap) {
 
-  int sck, client;
-  size_t addrlen;
-  struct sockaddr_in this_addr, peer_addr;
+  start_tap_server(port, cncio, cncio_tap);
 
-  return start_tap_server(port, cncio, cncio_tap);
+  dprintf(_W(cncio->out), "%s\n%s\n%s\n%s\n%s\n",
+          "Welcome to AFL Timewarp.",
+          "Start learning with \"L\"",
+          "reset to L and accept current input as Fuzzer input using \"R\" (repeat this multiple times),",
+          "then start Fuzzing with \"F\",",
+          "exit with \"E\"."); // TODO: Payload or not?
 
   /**
   if (cpid == 0) {
@@ -356,10 +317,6 @@ int start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap) 
     fcntl(pipefd[0], F_SETFL, O_NONBLOCK); // non blocking beauty
   }
    **/
-
-  FATAL("Not implemented yet");
-  return 0;
-
 }
 
 
@@ -378,11 +335,19 @@ stdpipes create_stdpipes() {
  * Block until we got a connection on the I/O port
  */
 
-int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *cncio_tap) {
+void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
 
   SAYF("Waiting for connection to stdin/stdout socket on port %s", port);
-  return start_tap_server(port, stdio, cncio_tap);
+  start_tap_server(port, stdio, stdio_tap);
 
+  /**
+  dprintf(_W(stdio->out), "%s",
+              "Welcome to AF1's TimeWarp port.\n"
+              "Interact with the program for as long as you like.\n"
+              "To start fuzzing, connect to the CnC port.\n"
+              "Handing over connection to child now.\n"
+              "________________________________\n"
+  );*/
 }
 
 #pragma clang diagnostic pop
@@ -439,4 +404,4 @@ void ck_dup2(int fd_new, int fd_old) {
   if (dup2(fd_new, fd_old) < 0) PFATAL("dup2 failed");
 }
 
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */

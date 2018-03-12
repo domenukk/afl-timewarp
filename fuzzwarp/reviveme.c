@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define OK       0
 #define NO_INPUT 1
 #define TOO_LONG 2
+
+#define PWSIZE 128
 
 static int getLine(char *prmpt, char *buff, size_t sz) {
   int ch, extra;
@@ -31,17 +34,21 @@ static int getLine(char *prmpt, char *buff, size_t sz) {
   return OK;
 }
 
+int func(void) {
+  printf("What?");
+}
+
 
 // Test program for getLine().
 
 int main(void) {
   int rc;
 
-  char pw[128];
-  char buf[sizeof(pw)];
-  char complete[sizeof(buf) * 2];
+  char *pw = (char *)malloc(PWSIZE * sizeof(char));
+  char *buf = (char *)malloc(PWSIZE * sizeof(char));
+  char *complete = (char *)malloc(PWSIZE * 2 * sizeof(char));
 
-  rc = getLine("Enter 8 Char Pwd> ", buf, sizeof(buf));
+  rc = getLine("Enter 8 Char Pwd> ", buf, PWSIZE);
   if (rc == NO_INPUT) {
     // Extra NL since my system doesn't output that on EOF.
     return printf("\nNo Input\n");
@@ -50,21 +57,27 @@ int main(void) {
     return printf("Input too long [%s]\n", buf);
   }
 
-  getLine("Same Pwd again> ", pw, sizeof(pw));
+  getLine("Same Pwd again> ", pw, PWSIZE);
   if (strlen(pw) < 8) {
     return fprintf(stderr, "Password needs to be 8 chars");
   }
-  if (strncmp(buf, pw, sizeof(buf)) != 0) {
+  if (strncmp(buf, pw, PWSIZE) != 0) {
     return fprintf(stderr, "Passwords did not match.");
   }
 
-  strncat(complete, buf, sizeof(complete));
+  strncat(complete, buf, PWSIZE * 2);
 
-  getLine("String to append to pwd> ", buf, sizeof(buf));
+  getLine("String to append to pwd> ", buf, PWSIZE);
 
-  strncat(complete + strlen(complete), buf, sizeof(complete - strlen(complete)));
+  strncat(complete + strlen(complete), buf, PWSIZE * 2 - strlen(complete));
 
   printf("We got [%s]\n", complete);
+
+  free(pw);
+  free(buf);
+  free(complete);
+
+  printf("Success :)");
 
   return 0;
 }

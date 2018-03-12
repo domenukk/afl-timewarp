@@ -3,11 +3,9 @@ project(fuzzwarp)
 
 add_definitions(-DTIMEWARP_MODE)
 
-
 add_definitions(-DPREFIX=".")
 add_definitions(-DHELPER_PATH="./lib/afl")
 add_definitions(-DBIN_PATH="./bin")
-#add_definitions(-DVERSION="fuzzwarp")
 
 add_definitions(-DAFL_PATH="./lib/afl")
 add_definitions(-DHELPER_PATH="./lib/afl")
@@ -28,17 +26,21 @@ add_executable(fuzzwarp
         debug.h
         hash.h
         types.h
-        fuzzwarp/timewarp_dev/src/afl-timewarp.h
-        fuzzwarp/timewarp_dev/src/afl-timewarp.c
+        fuzzwarp/afl-timewarp.h
+        fuzzwarp/afl-timewarp.c
         )
 
 add_executable(reviveme
         fuzzwarp/reviveme.c)
 
+add_custom_target(fuzzwarp_example
+        DEPENDS fuzzwarp reviveme
+        )
+
 add_executable(timewarp_test
-        fuzzwarp/timewarp_dev/src/timewarp_test.c
-        fuzzwarp/timewarp_dev/src/afl-timewarp.h
-        fuzzwarp/timewarp_dev/src/afl-timewarp.c
+        fuzzwarp/timewarp_test.c
+        fuzzwarp/afl-timewarp.h
+        fuzzwarp/afl-timewarp.c
         )
 
 find_package( ZLIB REQUIRED )

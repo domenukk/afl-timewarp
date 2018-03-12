@@ -6,10 +6,13 @@
 
 int main(int argc, int argv) {
   printf("starting.");
-  stdpipes stdio = create_stdpipes();
-  stdpipes stdio_tap = create_stdpipes();
+  stdpipes stdio;
+  stdpipes stdio_tap;
 
   char *stdio_srv_port = PORT;
+
+  open_stdpipes(&stdio);
+  open_stdpipes(&stdio_tap);
 
   start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 

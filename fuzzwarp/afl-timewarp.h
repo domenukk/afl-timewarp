@@ -13,24 +13,10 @@
 #define MAX_CNC_LINE_LENGTH 4096         /* Longer lines will be ignored for CNC */
 
 /**
- * Get amount of varargs
- */
-
-#define __NUM_ARGS__(...)  (sizeof((int[]){__VA_ARGS__})/sizeof(int))
-
-/**
- * Close a number of fds
- */
-
-#define CLOSE_ALL(...) do{ \
-  close_all(__NUM_ARGS__(__VA_ARGS__), __VA_ARGS__); \
-} while(0)
-
-/**
  * DePipe it
  */
 
-#define _P(pipe) (pipe)[1], (pipe)[2]
+#define _P(pipe) (pipe)[0], (pipe)[1]
 
 /**
  * DePipe standardin/out
@@ -46,6 +32,29 @@
 
 #define _R(pipe) (pipe)[0]
 #define _W(pipe) (pipe)[1]
+
+/**
+ * Get amount of varargs
+ */
+
+#define __NUM_ARGS__(...)  (sizeof((int[]){__VA_ARGS__})/sizeof(int))
+
+/**
+ * Close a number of fds
+ */
+
+#define CLOSE_ALL(...) do{ \
+  close_all(__NUM_ARGS__(__VA_ARGS__), __VA_ARGS__); \
+} while(0)
+
+
+/**
+ * Closes all fds that are not provided in this list.
+ * Large overhead, prefer CLOSE_ALL if possible.
+ */
+
+#define CLOSE_OTHERS(...) \
+  (close_others(__NUM_ARGS__(__VA_ARGS__), __VA_ARGS__))
 
 /**
  * Closes up to len sockets
@@ -75,18 +84,16 @@ void ck_dup2(int fd_new, int fd_old);
  * Initiates and starts the timewarp server, handling stdin over socket
  * @param port the port to listen to
  * @param pipefd the pipe to forward socket data to
- * @return error code or 0 if successful
  */
-int start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap);
+void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap);
 
 /**
  * IO to the timewarped process
  * @param port the port
  * @param stdio stdio[0] will include user input, child process output an errors should be redirected stdio[1]
  * @param stdio_cpy if not NULL, stdio_cpy[0] will be filled with user input, stdio_cpy[1] with program output
- * @return error codes if needed
  */
-int start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *cncio_tap);
+void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap);
 
 /**
  * Stringify a stage name
@@ -107,7 +114,11 @@ timewarp_stage get_last_action();
  */
 stdpipes create_stdpipes();
 
+void open_stdpipes(stdpipes *stdio);
+
 void timewarp_tidy();
 
-#endif /* ^TIMEWARP_MODE */
-#endif /* ^FUZZWARP_AFL_TIMEWARP_H */
+int close_others(int count, ...);
+
+#endif /* TIMEWARP_MODE */
+#endif /* FUZZWARP_AFL_TIMEWARP_H */

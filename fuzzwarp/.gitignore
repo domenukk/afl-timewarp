@@ -1,5 +1,5 @@
 tmp
-afl/qemu_mode/qemu-*
+test_out
 .vagrant
 *.log
 
