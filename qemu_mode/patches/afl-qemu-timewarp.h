@@ -25,6 +25,9 @@ typedef enum _timewarp_stages {
 #define TW_SIGNAL TARGET_SIGUSR2
 
 extern timewarp_stage tw_stage;
+extern char tw_in_syscall;
+// TODO: Where is target_ulong defined?
+extern unsigned long long tw_pos;
 extern char tw_exec;
 
 

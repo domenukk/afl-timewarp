@@ -29,6 +29,8 @@
 #include <sys/shm.h>
 #include "../../config.h"
 
+#include "../qemu-2.10.0/linux-user/qemu.h"
+
 #define TIMEWARP_MODE 1
 
 #include "./afl-qemu-timewarp.h"
@@ -52,6 +54,7 @@
 
 #define AFL_QEMU_CPU_SNIPPET2 do { \
     if(tw_exec || itb->pc == afl_entry_point) { \
+      tw_exec = 0; \
       afl_setup(); \
       afl_forkserver(cpu); \
     } \
@@ -76,7 +79,9 @@ abi_ulong afl_entry_point, /* ELF entry point (_start) */
 
 /* More variables, used for timewarp mode */
 timewarp_stage tw_stage = TW_DEACTIVATED;
-char tw_exec = 0;
+char tw_exec = 0; /* 1 -> We need to execute TimeWarp Mode */
+char tw_in_syscall = 0; /* 1 -> Forked in a syscall, retry it. */
+unsigned long long tw_pos; /* The entry point we want to start our fuzzing in. */
 
 /* Set in the child process in forkserver mode: */
 
@@ -117,10 +122,14 @@ static inline TranslationBlock *tb_find(CPUState*, TranslationBlock*, int);
 
 static void afl_setup(void) {
 
+  gemu_log("afl setup called :)\n");
+
   char *id_str = getenv(SHM_ENV_VAR),
        *inst_r = getenv("AFL_INST_RATIO");
 
   int shm_id;
+
+  //TODO: tw_in_syscall = 0; // If it was in syscall alrady, it'll have to do it again.
 
   if (inst_r) {
 
@@ -139,6 +148,8 @@ static void afl_setup(void) {
 
     shm_id = atoi(id_str);
     afl_area_ptr = shmat(shm_id, NULL, 0);
+
+    gemu_log("shmid %d", shm_id);
 
     if (afl_area_ptr == (void*)-1) exit(1);
 
@@ -169,6 +180,8 @@ static void afl_setup(void) {
 
   rcu_disable_atfork();
 
+  gemu_log("Returning from start\n");
+
 }
 
 
@@ -182,6 +195,8 @@ static void afl_forkserver(CPUState *cpu) {
 
   /* Tell the parent that we're alive. If the parent doesn't want
      to talk, assume that we're not running in forkserver mode. */
+
+  gemu_log("Forkserver <3\n");
 
   if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
@@ -204,10 +219,13 @@ static void afl_forkserver(CPUState *cpu) {
     if (pipe(t_fd) || dup2(t_fd[1], TSL_FD) < 0) exit(3);
     close(t_fd[1]);
 
+    gemu_log("FORKING\n");
+
     child_pid = fork();
     if (child_pid < 0) exit(4);
 
     if (!child_pid) {
+       gemu_log("Forkk yeah\n");
 
       /* Child process. Close descriptors and run free. */
 
