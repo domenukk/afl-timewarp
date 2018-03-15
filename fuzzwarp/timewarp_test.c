@@ -1,11 +1,36 @@
-#include <unistd.h>
 #include <stdio.h>
 #include "afl-timewarp.h"
 
+#include<signal.h>
+
 #define PORT "2800"
 
+void sig_handler(int signo)
+{
+  printf("Signal received\n");
+  if (signo == SIGUSR1) {
+    printf("received SIGUSR1\n");
+    int pid = fork();
+    if (!pid) {
+      printf("I'm the child :)");
+      fflush(stdout);
+    }
+    else {
+      printf("Parent right here.");
+      fflush(stdout);
+    }
+  }
+}
+
 int main(int argc, int argv) {
+
   printf("starting.");
+
+  /*if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
+    printf("\ncan't catch SIGUSR1\n");
+    return 1;
+  }*/
+
   stdpipes stdio;
   stdpipes stdio_tap;
 
@@ -26,8 +51,9 @@ int main(int argc, int argv) {
       _W(stdio_tap.err)
   );
 
-  execv("./reviveme", NULL);
-  printf("done");
+  int rec = execv("./reviveme", NULL);
+
+  printf("done, %d", rec);
 
   return 0;
 

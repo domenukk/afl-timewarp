@@ -65,6 +65,7 @@
 void close_all(size_t len, ...);
 
 typedef enum _timewarp_stage {
+  STAGE_STDIO = 'I',
   STAGE_LEARN = 'L',
   STAGE_TIMEWARP = 'W',
   STAGE_FUZZ = 'F',

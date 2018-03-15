@@ -58,11 +58,10 @@ int main(void) {
   }
 
   getLine("Same Pwd again> ", pw, PWSIZE);
-  if (strlen(pw) < 8) {
-    return fprintf(stderr, "Password needs to be 8 chars");
-  }
-  if (strncmp(buf, pw, PWSIZE) != 0) {
-    return fprintf(stderr, "Passwords did not match.");
+  if (strlen(pw) < 8 || strncmp(buf, pw, PWSIZE) != 0) {
+    fprintf(stderr, "Passwords needs to be at least 8 chars long and matching.");
+    fflush(stderr);
+    return 1;
   }
 
   strncat(complete, buf, PWSIZE * 2);
@@ -72,6 +71,8 @@ int main(void) {
   strncat(complete + strlen(complete), buf, PWSIZE * 2 - strlen(complete));
 
   printf("We got [%s]\n", complete);
+
+  fflush(stdout);
 
   free(pw);
   free(buf);

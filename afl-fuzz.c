@@ -136,6 +136,7 @@ timewarp_stage warp_stage;            /* The stage TimeWarp is in atm     */
 stdpipes stdio = {0};                 /* Pipes used for stdio redirection */
 stdpipes stdio_tap = {0};             /* Pipe to access stdio from        */
 stdpipes cncio = {0};                 /* The CnC pipe. Remote control AF1 */
+stdpipes cncio_tap = {0};             /* Tap or cnc. Parent may read      */
 
 //TODO: PARAMS
 u8* stdio_srv_port = "2800";          /* Server port for stdio            */
@@ -2006,8 +2007,6 @@ EXP_ST void tw_start_fuzz() {
 
 }
 
-
-
 /* Spin up fork server (instrumented mode only). The idea is explained here:
 
    http://lcamtuf.blogspot.com/2014/10/fuzzing-binaries-without-execve.html
@@ -2082,7 +2081,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (timewarp_mode) {
 
-      // start_timewarp_cnc_server(cnc_srv_port, &cncio, NULL); // TODO: Tap that?
+      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 

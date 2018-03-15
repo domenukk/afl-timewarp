@@ -29,6 +29,10 @@
 #include <sys/shm.h>
 #include "../../config.h"
 
+#define TIMEWARP_MODE 1
+
+#include "./afl-qemu-timewarp.h"
+
 /***************************
  * VARIOUS AUXILIARY STUFF *
  ***************************/
@@ -47,7 +51,7 @@
    regular instrumentation injected via afl-as.h. */
 
 #define AFL_QEMU_CPU_SNIPPET2 do { \
-    if(itb->pc == afl_entry_point) { \
+    if(tw_exec || itb->pc == afl_entry_point) { \
       afl_setup(); \
       afl_forkserver(cpu); \
     } \
@@ -68,6 +72,11 @@ static unsigned char *afl_area_ptr;
 abi_ulong afl_entry_point, /* ELF entry point (_start) */
           afl_start_code,  /* .text start pointer      */
           afl_end_code;    /* .text end pointer        */
+
+
+/* More variables, used for timewarp mode */
+timewarp_stage tw_stage = TW_DEACTIVATED;
+char tw_exec = 0;
 
 /* Set in the child process in forkserver mode: */
 
@@ -147,6 +156,12 @@ static void afl_setup(void) {
     afl_end_code   = (abi_ulong)-1;
 
   }
+
+//#ifdef TIMEWARP_MODE //TODO: Could do this always?
+  //if (getenv("TIMEWARP_MODE")) {
+    //tw_stage = TW_STDIO;
+  //}
+//#endif /* TIMEWARP_MODE */
 
   /* pthread_atfork() seems somewhat broken in util/rcu.c, and I'm
      not entirely sure what is the cause. This disables that
