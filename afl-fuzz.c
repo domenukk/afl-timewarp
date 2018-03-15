@@ -2081,8 +2081,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (timewarp_mode) {
 
-      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
-
+      //TODO: start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
       ck_dup2(_R(stdio.in), 0);
@@ -2094,6 +2093,8 @@ EXP_ST void init_forkserver(char** argv) {
           _W(stdio_tap.out),
           _W(stdio_tap.err)
       );
+
+      setenv("TIMEWARP_MODE", "1", 0);
 
       ck_write(st_pipe[1], "up!", 4, "write failed, did the parent die?");
 
