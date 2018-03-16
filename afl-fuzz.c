@@ -71,7 +71,7 @@
 #  define HAVE_AFFINITY 1
 #endif /* __linux__ */
 
-/* A toggle to export some variables when building as a library. Not very
+/* A toggle to export some riables when building as a library. Not very
    useful for the general public. */
 
 #ifdef AFL_LIB
@@ -2081,7 +2081,7 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (timewarp_mode) {
 
-      //TODO: start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
+      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
 
       ck_dup2(_R(stdio.in), 0);
