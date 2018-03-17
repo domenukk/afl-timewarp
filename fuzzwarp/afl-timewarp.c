@@ -404,4 +404,53 @@ void ck_dup2(int fd_new, int fd_old) {
   if (dup2(fd_new, fd_old) < 0) PFATAL("dup2 failed");
 }
 
+int read_line(int fd, char* buf, int len) {
+
+  int illegal = 0;
+  char *current;
+  char *next;
+
+  // TODO: fix this.
+  ssize_t len = read(fd, buf, len - (current) - 2);
+  if (len < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
+
+    if (illegal) {
+      current = strchr(buf, '\n');
+      if (current = NULL) {
+        current = buf;
+        continue;
+      }
+      illegal = 0;
+    }
+
+    next = strchr(current, '\n');
+    if (next == NULL) {
+      if (current == buf) {
+        dprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
+        illegal = 1;
+        continue;
+      }
+
+      memmove(buf, current, current - buf);
+      continue;
+
+    }
+    if (next == buf) {
+      memmove(buf, buf + 1, sizeof(buf));
+      continue;
+    }
+
+    next[0] = '\0';
+
+    if (buf[0] == 'F') {
+      dprintf(_W(cncio.out), "Starting to fuzz.");
+      warp_stage = STAGE_FUZZ;
+      // TODO: stdio foo.
+      break;
+    }
+    // TODO: Handle other actions
+
+}
+
+
 #endif /* TIMEWARP_MODE */

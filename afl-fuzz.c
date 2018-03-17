@@ -1987,26 +1987,6 @@ static void destroy_extras(void) {
 
 }
 
-EXP_ST void tw_start_fuzz() {
-
-  // TODO: More. For sure.
-
-  dup2(dev_null_fd, 1);
-  dup2(dev_null_fd, 2);
-
-  if (out_file) {
-
-    dup2(dev_null_fd, 0);
-
-  } else {
-
-    dup2(out_fd, 0);
-    close(out_fd);
-
-  }
-
-}
-
 /* Spin up fork server (instrumented mode only). The idea is explained here:
 
    http://lcamtuf.blogspot.com/2014/10/fuzzing-binaries-without-execve.html
@@ -7802,15 +7782,15 @@ static void save_cmdline(u32 argc, char** argv) {
 
 static void run_to_timewarp(char** argv) {
 
-  u8* use_mem;
-  u8  res;
+  u8 *use_mem;
+  u8 res;
   s32 fd;
 
   u64 start_us, stop_us;
 
   s32 old_sc = stage_cur, old_sm = stage_max;
   u32 use_tmout = exec_tmout;
-  u8* old_sn = stage_name;
+  u8 *old_sn = stage_name;
 
   u8 buf[MAX_CNC_LINE_LENGTH + 1] = {0};
 
@@ -7826,86 +7806,56 @@ static void run_to_timewarp(char** argv) {
 
   init_forkserver(argv);
 
-  stage_max  = fast_cal ? 3 : CAL_CYCLES;
+  stage_max = fast_cal ? 3 : CAL_CYCLES;
 
   warp_stage = STAGE_TIMEWARP;
 
-  while (warp_stage == STAGE_TIMEWARP) {
-    sleep(10);
+  ssize_t len = read(_R(cncio.in), &buf, sizeof(buf));
+  if (len < 1) PFATAL("CnC Socket no longer open");
+  // TODO: Handle better, handle 0 return, ...
+
+  // how do we get a full line here?
+  // in case we do wait for something, Send signal
+  SAYF("Starting Forkserver");
+  dprintf(_W(cncio.out), "Starting Forkserver");
+  kill(child_pid, SIGUSR2);
+
+  len = read(fsrv_st_fd, &buf, 4);
+  if (len < 1) PFATAL("Child is dead. xO");
+
+  // TODO: tw_stdio_takeover()
+
+  return;
+
+    // Forkserver is doing his business.
+
+    //TODO: get the output to shut up.
+    /*dup2(dev_null_fd, 1);
+    dup2(dev_null_fd, 2);
+
+    if (out_file) {
+
+      dup2(dev_null_fd, 0);
+
+    } else {
+
+      dup2(out_fd, 0);
+      close(out_fd);
+
+    }
+
+      close(out_dir_fd);
+      close(dev_null_fd);
+      close(dev_urandom_fd);
+      close(fileno(plot_file));
+
+
+     */
+
+    //TODO: Fuzz away :)
+
+
   }
-/*
-    ssize_t len = read(_R(cncio.in), current, sizeof(buf) - (current - buf) - 2);
-    if (len < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
-
-    if (illegal) {
-      current = strchr(buf, '\n');
-      if (current = NULL) {
-        current = buf;
-        continue;
-      }
-      illegal = 0;
-    }
-
-    next = strchr(current, '\n');
-    if (next == NULL) {
-      if (current == buf) {
-        dprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
-        illegal = 1;
-        continue;
-      }
-
-      memmove(buf, current, current - buf);
-      continue;
-
-    }
-    if (next == buf) {
-      memmove(buf, buf + 1, sizeof(buf));
-      continue;
-    }
-
-    next[0] = '\0';
-
-    if (buf[0] == 'F') {
-      dprintf(_W(cncio.out), "Starting to fuzz.");
-      warp_stage = STAGE_FUZZ;
-      // TODO: stdio foo.
-      break;
-    }
-    // TODO: Handle other actions
-
-
-  }
-
-  ABORT("Should implement fuzzing now.");
-
-// TODO: fuzz afterwards
-  /*
-  start_us = get_cur_time_us();
-
-  u32 cksum;
-
-  // TODO: Do something like:  write_to_testcase(use_mem, q->len);
-
-  u8 fault = run_target(argv, use_tmout);
-
-  /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
-     we want to bail out quickly. */
-
-  /*
-
-  // TODO if (stop_soon || fault != crash_mode) goto abort_calibration;
-
-  stop_us = get_cur_time_us();
-
-  total_cal_us     += stop_us - start_us;
-  total_cal_cycles += stage_max;
-
-  /* If this case didn't result in new output from the instrumentation, tell
-     parent. This is a non-critical problem, but something to warn the user
-     about. */
-
-
-  if (stop_soon) return;
 
 }
 
@@ -8241,9 +8191,9 @@ int main(int argc, char** argv) {
     run_to_timewarp(use_argv);
 
     if (stop_soon) goto stop_fuzzing;
-    if (warp_stage == STAGE_TIMEWARP) {
+    /*if (warp_stage == STAGE_TIMEWARP) {
       timewarp();
-    }
+    }*/
   }
 #endif /* TIMEWARP_MODE */
 
