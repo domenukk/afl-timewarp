@@ -7843,6 +7843,7 @@ static void run_to_timewarp(char** argv) {
       close(out_fd);
 
     }
+ssww
 
       close(out_dir_fd);
       close(dev_null_fd);
@@ -7854,8 +7855,6 @@ static void run_to_timewarp(char** argv) {
 
     //TODO: Fuzz away :)
 
-
-  }
 
 }
 

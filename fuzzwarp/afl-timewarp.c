@@ -404,19 +404,23 @@ void ck_dup2(int fd_new, int fd_old) {
   if (dup2(fd_new, fd_old) < 0) PFATAL("dup2 failed");
 }
 
+/** TODO
 int read_line(int fd, char* buf, int len) {
 
   int illegal = 0;
-  char *current;
+  char *current =  buf;
   char *next;
 
   // TODO: fix this.
-  ssize_t len = read(fd, buf, len - (current) - 2);
-  if (len < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
+  ssize_t n = read(fd, buf, len + (current - buf) - 2);
+  if (n < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
+
+  while(1)
 
     if (illegal) {
       current = strchr(buf, '\n');
       if (current = NULL) {
+        dprintf(fd, "Ignored long line\n");
         current = buf;
         continue;
       }
@@ -426,7 +430,7 @@ int read_line(int fd, char* buf, int len) {
     next = strchr(current, '\n');
     if (next == NULL) {
       if (current == buf) {
-        dprintf(_W(cncio.err), "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
+        dprintffd, "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
         illegal = 1;
         continue;
       }
@@ -450,7 +454,9 @@ int read_line(int fd, char* buf, int len) {
     }
     // TODO: Handle other actions
 
-}
+  return buf;
 
+}
+**/
 
 #endif /* TIMEWARP_MODE */

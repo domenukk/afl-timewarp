@@ -59,7 +59,7 @@ int main(void) {
 
   getLine("Same Pwd again> ", pw, PWSIZE);
   if (strlen(pw) < 8 || strncmp(buf, pw, PWSIZE) != 0) {
-    fprintf(stderr, "Passwords needs to be at least 8 chars long and matching.");
+    fprintf(stderr, "Passwords needs to be at least 8 chars long and matching.\n");
     fflush(stderr);
     return 1;
   }
