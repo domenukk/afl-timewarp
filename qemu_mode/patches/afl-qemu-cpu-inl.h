@@ -66,6 +66,10 @@
 
 #define TSL_FD (FORKSRV_FD - 1)
 
+/* Timewarp needs to switch betweeen two input FDs, stdin is user provided fuzz via afl. */
+#define STDIN_FD (FORKSRV_FD - 2)
+#define FUZZ_FD (FORKSRV_FD + 2)
+
 /* This is equivalent to afl-as.h: */
 
 static unsigned char *afl_area_ptr;
@@ -193,10 +197,20 @@ static void afl_forkserver(CPUState *cpu) {
 
   if (!afl_area_ptr) return;
 
+  if (tw_stage == TW_FUZZ) {
+
+    gemu_log("Timewarping forkserver <3\n");
+
+    /* Store fd0 so we can reuse it later for timewarping */
+    if (dup2(STDIN_FD, 0) < 0) exit(10);
+
+    /* since stdin is actually coming over the network, use the pipe on FORKSRV_FD + 2 for fuzzing instead. */
+    if (dup2(FUZZ_FD, 0) < 0) exit(11);
+
+  }
+
   /* Tell the parent that we're alive. If the parent doesn't want
      to talk, assume that we're not running in forkserver mode. */
-
-  gemu_log("Forkserver <3\n");
 
   if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
@@ -225,13 +239,13 @@ static void afl_forkserver(CPUState *cpu) {
     if (child_pid < 0) exit(4);
 
     if (!child_pid) {
-       gemu_log("Forkk yeah\n");
 
       /* Child process. Close descriptors and run free. */
 
       afl_fork_child = 1;
       close(FORKSRV_FD);
       close(FORKSRV_FD + 1);
+      close(STDIN_FD);
       close(t_fd[0]);
       return;
 

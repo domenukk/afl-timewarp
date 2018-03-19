@@ -2017,9 +2017,9 @@ EXP_ST void init_forkserver(char** argv) {
     /* Umpf. On OpenBSD, the default fd limit for root users is set to
        soft 128. Let's try to fix that... */
 
-    if (!getrlimit(RLIMIT_NOFILE, &r) && r.rlim_cur < FORKSRV_FD + 2) {
+    if (!getrlimit(RLIMIT_NOFILE, &r) && r.rlim_cur < FORKSRV_FD + 3) {
 
-      r.rlim_cur = FORKSRV_FD + 2;
+      r.rlim_cur = FORKSRV_FD + 3;
       setrlimit(RLIMIT_NOFILE, &r); /* Ignore errors */
 
     }
@@ -2067,6 +2067,8 @@ EXP_ST void init_forkserver(char** argv) {
       ck_dup2(_R(stdio.in), 0);
       ck_dup2(_W(stdio.out), 1);
       ck_dup2(_W(stdio.err), 2);
+
+      ck_dup2(out_fd, FUZZ_FD);
 
       CLOSE_ALL(
           _W(stdio_tap.in),
@@ -7843,7 +7845,6 @@ static void run_to_timewarp(char** argv) {
       close(out_fd);
 
     }
-ssww
 
       close(out_dir_fd);
       close(dev_null_fd);
@@ -8128,9 +8129,12 @@ int main(int argc, char** argv) {
 
 #ifdef TIMEWARP_MODE
   if (timewarp_mode) {
+
     if (!qemu_mode) FATAL("TimeWarp Mode (-W) is currently only supported with QEMU instrumentation (-Q)");
+    //TODO: Is this really true?
     if (out_file) FATAL("TimeWarp Mode (-W) can only be used to fuzz standard input. -W and -f are mutually exclusive");
     if (no_forkserver) FATAL("TimeWarp Mode (-W) and AFL_NO_FORKSRV are mutually exclusive");
+
   }
 #endif /* TIMEWARP_MODE */
 

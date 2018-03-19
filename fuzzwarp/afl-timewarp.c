@@ -208,7 +208,7 @@ static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
 
   inet_ntop(their_addr_storage.ss_family, sin_addr, s, sizeof s);
 
-  SAYF("TimeWarp accepted new Client on port %s\n", s);
+  SAYF("TimeWarp accepted new Client on port %s\n", port);
 
   close(server_fd); // Already got a connection to this one. :)
 
@@ -337,7 +337,7 @@ stdpipes create_stdpipes() {
 
 void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
 
-  SAYF("Waiting for connection to stdin/stdout socket on port %s", port);
+  SAYF("Waiting for connection to stdin/stdout socket on port %s\n", port);
   start_tap_server(port, stdio, stdio_tap);
 
   /**

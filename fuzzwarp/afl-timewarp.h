@@ -10,6 +10,8 @@
 
 #ifdef TIMEWARP_MODE
 
+#define FUZZ_FD (FORKSRV_FD + 2)         /* Filedescriptor for Fuzzer -> Target STDIN */
+
 #define MAX_CNC_LINE_LENGTH 4096         /* Longer lines will be ignored for CNC */
 
 /**
