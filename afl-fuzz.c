@@ -2061,8 +2061,8 @@ EXP_ST void init_forkserver(char** argv) {
 
     if (timewarp_mode) {
 
-      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
+      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
 
       ck_dup2(_R(stdio.in), 0);
       ck_dup2(_W(stdio.out), 1);

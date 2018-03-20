@@ -137,7 +137,7 @@ echo "[+] Patching done."
 # --enable-pie seems to give a couple of exec's a second performance
 # improvement, much to my surprise. Not sure how universal this is..
 
-CFLAGS="-O3 -ggdb" ./configure --disable-system \
+CFLAGS="-O0 -ggdb" ./configure --disable-system \
   --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
   --target-list="${CPU_TARGET}-linux-user" --python=$(which python2) --enable-pie --enable-kvm || exit 1
 

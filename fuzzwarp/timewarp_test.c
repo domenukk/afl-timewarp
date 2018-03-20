@@ -2,11 +2,11 @@
 #include "afl-timewarp.h"
 
 #include<signal.h>
+#include <memory.h>
 
 #define PORT "2800"
 
-void sig_handler(int signo)
-{
+void sig_handler(int signo) {
   printf("Signal received\n");
   if (signo == SIGUSR1) {
     printf("received SIGUSR1\n");
@@ -14,8 +14,7 @@ void sig_handler(int signo)
     if (!pid) {
       printf("I'm the child :)");
       fflush(stdout);
-    }
-    else {
+    } else {
       printf("Parent right here.");
       fflush(stdout);
     }
@@ -25,6 +24,15 @@ void sig_handler(int signo)
 int main(int argc, int argv) {
 
   printf("starting.");
+/*
+  char buf[16];
+  strncpy(buf, ""
+      "Thank you for your attention."
+      "\n", sizeof(buf));
+  printf("%s", buf);
+
+  return 0;
+*/
 
   /*if (signal(SIGUSR1, sig_handler) == SIG_ERR) {
     printf("\ncan't catch SIGUSR1\n");
