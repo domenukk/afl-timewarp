@@ -59,6 +59,7 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
+#include <glob.h>
 
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
@@ -2062,7 +2063,7 @@ EXP_ST void init_forkserver(char** argv) {
     if (timewarp_mode) {
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
-      //start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
+      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
 
       ck_dup2(_R(stdio.in), 0);
       ck_dup2(_W(stdio.out), 1);

@@ -153,8 +153,6 @@ static void afl_setup(void) {
     shm_id = atoi(id_str);
     afl_area_ptr = shmat(shm_id, NULL, 0);
 
-    gemu_log("shmid %d", shm_id);
-
     if (afl_area_ptr == (void*)-1) exit(1);
 
     /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
@@ -184,8 +182,6 @@ static void afl_setup(void) {
 
   rcu_disable_atfork();
 
-  gemu_log("Returning from start\n");
-
 }
 
 
@@ -204,7 +200,7 @@ static void afl_forkserver(CPUState *cpu) {
     gemu_log("Timewarping forkserver <3\n");
 
     /* Store fd0 so we can reuse it later for timewarping */
-    if (dup2(STDIN_FD, 0) < 0) exit(10);
+    if (dup2(0, STDIN_FD) < 0) exit(10);
 
     /* since stdin is actually coming over the network, use the pipe on FORKSRV_FD + 2 for fuzzing instead. */
     if (dup2(FUZZ_FD, 0) < 0) exit(11);
