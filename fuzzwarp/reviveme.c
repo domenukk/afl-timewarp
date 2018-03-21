@@ -53,6 +53,13 @@ int main(void) {
   fgets(buf, bufsize, stdin);
 
   size_t length = strlen(buf);
+
+  if (length < 5) {
+    printf("nothing to do");
+    fflush(stdout);
+    exit(0);
+  }
+
   if (length > 5) {
     printf("5");
   }
@@ -61,11 +68,9 @@ int main(void) {
     bufsize *= length;
   }
 
-
   strncat(complete, buf, bufsize - strlen(complete));
 
   printf("We got [%s]\n", complete);
-
   fflush(stdout);
 
   free(pw);
