@@ -80,7 +80,14 @@ typedef int64_t  s64;
 #define MEM_BARRIER() \
   asm volatile("" ::: "memory")
 
+/* likely/unlikely already defined in qemu mode, check if we would redefine it. */
+
+#ifndef likely
 #define likely(_x)   __builtin_expect(!!(_x), 1)
+#endif /* likely */
+
+#ifndef unlikely
 #define unlikely(_x)  __builtin_expect(!!(_x), 0)
+#endif /* unlikely */
 
 #endif /* ! _HAVE_TYPES_H */

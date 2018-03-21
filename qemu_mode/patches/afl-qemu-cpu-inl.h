@@ -53,7 +53,7 @@
    regular instrumentation injected via afl-as.h. */
 
 #define AFL_QEMU_CPU_SNIPPET2 do { \
-    if(tw_exec || itb->pc == afl_entry_point) { \
+    if(tw_exec || (afl_entry_point && itb->pc == afl_entry_point)) { \
       tw_exec = 0; \
       afl_setup(); \
       afl_forkserver(cpu); \
@@ -76,7 +76,7 @@ static unsigned char *afl_area_ptr;
 
 /* Exported variables populated by the code patched into elfload.c: */
 
-abi_ulong afl_entry_point, /* ELF entry point (_start) */
+abi_ulong afl_entry_point = 0, /* ELF entry point (_start) */
           afl_start_code,  /* .text start pointer      */
           afl_end_code;    /* .text end pointer        */
 
@@ -126,7 +126,7 @@ static inline TranslationBlock *tb_find(CPUState*, TranslationBlock*, int);
 
 static void afl_setup(void) {
 
-  gemu_log("afl setup called :)\n");
+  gemu_log("Forkserver afl setup, entrypoint: %lu, tw_stage: %d, tw_exec: %d\n", afl_entry_point, tw_stage, tw_exec);
 
   char *id_str = getenv(SHM_ENV_VAR),
        *inst_r = getenv("AFL_INST_RATIO");
@@ -194,6 +194,8 @@ static void afl_setup(void) {
 static void afl_forkserver(CPUState *cpu) {
 
   static unsigned char tmp[4];
+
+  gemu_log("Forkserver afl_forkserver, entrypoint: %lu, tw_stage: %d, tw_exec: %d\n", afl_entry_point, tw_stage, tw_exec);
 
   if (!afl_area_ptr) return;
 

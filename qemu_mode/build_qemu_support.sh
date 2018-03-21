@@ -110,12 +110,12 @@ else
 
 fi
 
-echo "[*] Uncompressing archive (this will take a while)..."
+#echo "[*] Uncompressing archive (this will take a while)..."
 
-rm -rf "qemu-${VERSION}" || exit 1
-tar xf "$ARCHIVE" || exit 1
+#rm -rf "qemu-${VERSION}" || exit 1
+#tar xf "$ARCHIVE" || exit 1
 
-echo "[+] Unpacking successful."
+#echo "[+] Unpacking successful."
 
 echo "[*] Configuring QEMU for $CPU_TARGET..."
 
@@ -126,18 +126,18 @@ test "$CPU_TARGET" = "i686" && CPU_TARGET="i386"
 
 cd qemu-$VERSION || exit 1
 
-echo "[*] Applying patches..."
+#echo "[*] Applying patches..."
 
-patch -p1 <../patches/elfload.diff || exit 1
-patch -p1 <../patches/cpu-exec.diff || exit 1
-patch -p1 <../patches/syscall.diff || exit 1
+#patch -p1 <../patches/elfload.diff || exit 1
+#patch -p1 <../patches/cpu-exec.diff || exit 1
+#patch -p1 <../patches/syscall.diff || exit 1
 
-echo "[+] Patching done."
+#echo "[+] Patching done."
 
 # --enable-pie seems to give a couple of exec's a second performance
 # improvement, much to my surprise. Not sure how universal this is..
 
-CFLAGS="-O0 -ggdb" ./configure --disable-system \
+CFLAGS="-O3 -ggdb" ./configure --disable-system \
   --enable-linux-user --disable-gtk --disable-sdl --disable-vnc \
   --target-list="${CPU_TARGET}-linux-user" --python=$(which python2) --enable-pie --enable-kvm || exit 1
 
