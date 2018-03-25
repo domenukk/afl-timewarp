@@ -1,11 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <glob.h>
-
-#define OK       0
-#define NO_INPUT 1
-#define TOO_LONG 2
 
 #define PWSIZE 8
 
@@ -16,7 +11,6 @@ int func(void) {
 // Test program for getLine().
 
 int main(void) {
-  int rc;
 
   size_t bufsize = (PWSIZE + 1) * sizeof(char);
 

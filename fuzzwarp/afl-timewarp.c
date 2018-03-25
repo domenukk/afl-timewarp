@@ -15,17 +15,6 @@
 #include <sys/resource.h>
 #include <stdbool.h>
 
-#define BACKLOG 10               /* how many pending connections queue will hold */
-
-static void sigchld_handler(int s) {
-  // waitpid() might overwrite errno, so we save and restore it:
-  int saved_errno = errno;
-
-  while (waitpid(-1, NULL, WNOHANG) > 0);
-
-  errno = saved_errno;
-}
-
 /**
  * Rather dirty way to close all unneeded fds.
  * @param count
@@ -86,15 +75,6 @@ int close_others(int count, ...) {
 
 }
 
-static void writes(int socket_fd, char *s) {
-  write(socket_fd, s, strlen(s));
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn" // Supposed to run forever.
-
-#pragma clang diagnostic pop
-
 /*
  * Open a listening socket on the given port.
  * Will totally kill the application if an error occurs.
@@ -142,17 +122,12 @@ static int open_server_socket(char *port) {
   freeaddrinfo(servinfo);
 
   if (!p) FATAL("server: failed to bind to port %s\n", port);
-  if (listen(sock_fd, BACKLOG) == -1) PFATAL("Unable to listen on socket %s\n", port);
 
-  /*
-  sa.sa_handler = sigchld_handler; // reap all dead processes
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = SA_RESTART;
-  if (sigaction(SIGCHLD, &sa, NULL) == -1) PFATAL("Error in sigaction ");
-  */
+  if (listen(sock_fd, 10) == -1) PFATAL("Unable to listen on socket %s\n", port);
 
   SAYF("Started listening socket on port %s\n", port);
   return sock_fd;
+
 }
 
 /**
@@ -171,17 +146,36 @@ static void forward_output(int fd_from, int fd_to, int fd_to2) {
   ck_write(fd_to, buf, (size_t) len1, "Forwarding to fd");
 
   if (fd_to2 > -1) {
+
     ck_write(fd_to2, buf, (size_t) len1, "Forwarding to tap");
+
   }
 
 }
 
+/**
+ * Calls pipe on all elements of a stdpipes struct
+ * (in, out, error)
+ * @param pointer to a new instance of the pipes struct.
+ */
 void open_stdpipes(stdpipes *pipes) {
-  if (pipe(pipes->in) | pipe(pipes->out) | pipe(pipes->err)) {
+
+  if (pipe(pipes->in)
+      | pipe(pipes->out)
+      | pipe(pipes->err)) {
+
     PFATAL("Pipe failed");
+
   }
+
 }
 
+/**
+ * Starts a server that will forward socket communication will mirror all traffic to tap
+ * @param port Port to forward to stdpipes
+ * @param stdio An stdio element that forwards _R(in), _W(out), _W(err) to the given port.
+ * @param stdio_tap will receive all traffic in _R(in), _R(out), _R(err)
+ */
 static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
 
   open_stdpipes(stdio);
@@ -216,7 +210,7 @@ static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
   if (child < 0) FATAL("Fork failed");
 
   if (!child) {
-    // Thread forwarding the traffic.
+    // In child, forward the traffic.
 
     int in_fd = _W(stdio->in);
     int in_fd2 = stdio_tap ? _W(stdio_tap->in) : -1;
@@ -272,9 +266,10 @@ static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
     }
 
     ABORT("We left an endless loop?");
+
   }
 
-
+  // Parent: Close unnneeded foo.
   CLOSE_ALL(
       _W(stdio->in),
       _R(stdio->out),
@@ -291,6 +286,12 @@ static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
   }
 }
 
+/**
+ * Open the timewarp cnc server
+ * @param port server port
+ * @param cncio the stdio pipes
+ * @param cncio_tap tap object that will also receive any stdin/out data
+ */
 
 void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap) {
 
@@ -303,66 +304,27 @@ void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap)
           "then start Fuzzing with \"F\",",
           "exit with \"E\"."); // TODO: Payload or not?
 
-  /**
-  if (cpid == 0) {
-    // child
-    close(pipefd[0]); // close read-end of the pipe
-    _start_timewarp_server(port, pipefd);
-    // Never returns
-    fprintf(stderr, "Server loop exited; This point should never be reached.");
-    exit(1);
-  } else {
-
-    close(pipefd[1]); // close the write-end of the pipe, thus sending EOF to the reader
-    fcntl(pipefd[0], F_SETFL, O_NONBLOCK); // non blocking beauty
-  }
-   **/
 }
-
-
-stdpipes create_stdpipes() {
-  stdpipes pipes = {0};
-  pipe(pipes.in);
-  pipe(pipes.out);
-  pipe(pipes.err);
-  return pipes;
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-
-/*
- * Block until we got a connection on the I/O port
+/**
+ *
+ * Start the timewarp server.
+ * Blocks until we got a connection on the I/O port
+ * @param port the port to open server on
+ * @param stdio stdio element to forward io to
+ * @param stdio_tap tap port to output in and out of the io port
  */
-
 void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
 
   SAYF("Waiting for connection to stdin/stdout socket on port %s\n", port);
   start_tap_server(port, stdio, stdio_tap);
 
-  /**
   dprintf(_W(stdio->out), "%s",
               "Welcome to AF1's TimeWarp port.\n"
               "Interact with the program for as long as you like.\n"
               "To start fuzzing, connect to the CnC port.\n"
-              "Handing over connection to child now.\n"
+              "Child i/o will start after the beep.\n"
               "________________________________\n"
-  );*/
-}
-
-#pragma clang diagnostic pop
-
-
-timewarp_stage get_last_action() { /*int in_pipe) { */
-  timewarp_stage action;
-  // read_
-  //while (read(pipefd[0], &buf, 1) > 0) // read while EOF;
-//my_struct.a = 8;
-  /**
-   * TODO
-   */
-  //   {}
-  return STAGE_LEARN;
+  );
 }
 
 // TODO: What do I need to clean up?
@@ -370,93 +332,138 @@ void timewarp_tidy() {
   // Parent:
   //close(pipefd[1]);
   wait(NULL); // wait for the child process to exit before I do the same
+
 }
 
+
+/**
+ * Stringify timewarp stages
+ * @param stage stage
+ * @return a string representation of the current stage
+ */
 char *timewarp_stage_name(timewarp_stage stage) {
+
   switch (stage) {
+
     case STAGE_LEARN:
       return "Learning";
+
     case STAGE_TIMEWARP:
       return "TimeWarp";
+
     case STAGE_FUZZ:
       return "Fuzzing";
+
     case STAGE_QUIT:
       return "Quitting";
+
     default:
       return "Unknown";
+
   }
 }
 
+/**
+ * Closes all given sockets.
+ * If using the CLOSE_ALL makro, len will be filled in automatically,
+ * @param len the socket count
+ * @param ... socket fids (int)
+ */
 void close_all(size_t len, ...) {
 
   va_list params;
   va_start(params, len);
 
   for (size_t i = 0; i < len; i++) {
-    //printf("%d\n", va_arg(params, int));
+
     close(va_arg(params, int));
+
   }
 
   va_end(params);
+
 }
 
 void ck_dup2(int fd_new, int fd_old) {
   if (dup2(fd_new, fd_old) < 0) PFATAL("dup2 failed");
 }
 
-/** TODO
-int read_line(int fd, char* buf, int len) {
+/**
+ * Processes command and contro input
+ * @param fd the cnc in fd
+ * @return will not return.
+ *//*
 
-  int illegal = 0;
+int process_cnc(int fd) {
+
+  //TODO: (!!)
+  char buf[MAX_CNC_LINE_LENGTH];
   char *current =  buf;
   char *next;
+  int len = sizeof(buf);
+  int illegal = 0;
 
-  // TODO: fix this.
-  ssize_t n = read(fd, buf, len + (current - buf) - 2);
-  if (n < 1) FATAL("Connection to CnC Server lost. Aborting."); // TODO: RLY?
+  for (;;) {
 
-  while(1)
+    // TODO: fix this.
+    ssize_t n = read(fd, buf, len + (current - buf) - 2);
+
+    if (n == EINTR) continue;
+    if (n < 1) FATAL("Connection to CnC Server lost. Aborting.");
 
     if (illegal) {
+
       current = strchr(buf, '\n');
       if (current = NULL) {
+
         dprintf(fd, "Ignored long line\n");
         current = buf;
         continue;
+
       }
+
       illegal = 0;
+
     }
 
     next = strchr(current, '\n');
+
     if (next == NULL) {
+
       if (current == buf) {
-        dprintffd, "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
+
+        dprintf(fd, "Line exceeded limit of %d chars", MAX_CNC_LINE_LENGTH);
         illegal = 1;
         continue;
+
       }
 
       memmove(buf, current, current - buf);
       continue;
 
     }
+
     if (next == buf) {
+
       memmove(buf, buf + 1, sizeof(buf));
       continue;
+
     }
 
     next[0] = '\0';
 
     if (buf[0] == 'F') {
-      dprintf(_W(cncio.out), "Starting to fuzz.");
-      warp_stage = STAGE_FUZZ;
+
+      dprintf(fd, "Starting to fuzz.");
+      warp_mode = STAGE_FUZZ;
       // TODO: stdio foo.
       break;
+
     }
     // TODO: Handle other actions
 
   return buf;
-
 }
-**/
+ */
 
 #endif /* TIMEWARP_MODE */

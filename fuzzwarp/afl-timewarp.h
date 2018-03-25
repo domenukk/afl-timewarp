@@ -111,12 +111,6 @@ char *timewarp_stage_name(timewarp_stage stage);
  */
 timewarp_stage get_last_action();
 
-/**
- * Creates a bunch of pipes and opens them
- * @return stdpipes with opened in, out and err members.
- */
-stdpipes create_stdpipes();
-
 void open_stdpipes(stdpipes *stdio);
 
 void timewarp_tidy();
