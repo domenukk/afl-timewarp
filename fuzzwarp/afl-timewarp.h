@@ -67,19 +67,32 @@
 void close_all(size_t len, ...);
 
 typedef enum _timewarp_stage {
+
   STAGE_STDIO = 'I',
   STAGE_LEARN = 'L',
   STAGE_TIMEWARP = 'W',
   STAGE_FUZZ = 'F',
   STAGE_QUIT = 'Q'
+
 } timewarp_stage;
 
+/**
+ * STDPIPES struct
+ */
+
 typedef struct _stdpipes {
+
   int in[2];
   int out[2];
   int err[2];
+
 } stdpipes;
 
+/**
+ * Checked dup2(will ABORT on error)
+ * @param fd_new see man dup2
+ * @param fd_old see man dup2
+ */
 
 void ck_dup2(int fd_new, int fd_old);
 
@@ -88,6 +101,7 @@ void ck_dup2(int fd_new, int fd_old);
  * @param port the port to listen to
  * @param pipefd the pipe to forward socket data to
  */
+
 void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap);
 
 /**
@@ -96,6 +110,7 @@ void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap)
  * @param stdio stdio[0] will include user input, child process output an errors should be redirected stdio[1]
  * @param stdio_cpy if not NULL, stdio_cpy[0] will be filled with user input, stdio_cpy[1] with program output
  */
+
 void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap);
 
 /**
@@ -104,12 +119,6 @@ void start_timewarp_io_server(char *port, stdpipes *stdio, stdpipes *stdio_tap);
  * @return A char* to the stage
  */
 char *timewarp_stage_name(timewarp_stage stage);
-
-/**
- *
- * @return
- */
-timewarp_stage get_last_action();
 
 void open_stdpipes(stdpipes *stdio);
 

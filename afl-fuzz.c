@@ -34,6 +34,7 @@
 
 #ifdef TIMEWARP_MODE
 #include "fuzzwarp/afl-timewarp.h"
+
 #endif /* TIMEWARP_MODE */
 
 #include <stdio.h>
@@ -7783,7 +7784,7 @@ static void save_cmdline(u32 argc, char** argv) {
 
 /* runs the program, forwarding stdin and out until the user starts timewarp mode. */
 
-static void run_to_timewarp(char** argv) {
+static void tw_init(char **argv) {
 
   u8 *use_mem;
   u8 res;
@@ -7822,49 +7823,37 @@ static void run_to_timewarp(char** argv) {
   SAYF("Starting Forkserver\n");
   dprintf(_W(cncio.out), "Starting Forkserver");
 
+  // make sure we don't send kill to -1 (would hurts a lot)
   if (forksrv_pid < 1) FATAL("Unknown forkserver pid");
   kill(forksrv_pid, SIGUSR2);
 
   len = read(fsrv_st_fd, &buf, 4);
   if (len < 1) PFATAL("Child is dead. xO");
 
-  // TODO: tw_stdio_takeover()
-
   return;
-
-    // Forkserver is doing his business.
-
-    //TODO: get the output to shut up.
-    /*dup2(dev_null_fd, 1);
-    dup2(dev_null_fd, 2);
-
-    if (out_file) {
-
-      dup2(dev_null_fd, 0);
-
-    } else {
-
-      dup2(out_fd, 0);
-      close(out_fd);
-
-    }
-
-      close(out_dir_fd);
-      close(dev_null_fd);
-      close(dev_urandom_fd);
-      close(fileno(plot_file));
-
-
-     */
-
-    //TODO: Fuzz away :)
-
 
 }
 
+/**
+ * The timewarp modes 
+ */
 
 void timewarp() {
+
   FATAL("Should really implement timewarp mode at some point. TODO :)");
+/*
+    cnc_buf[MAX_CNC_LINE_LENGTH];
+
+    do {
+
+      tw_mode = tw_next_mode(_R(cncio.in), cnc_buf, cnc_len, );
+
+
+
+      } while(tw_mode != TW_FUZZ && !stop_soon);
+
+    return;*/
+
 }
 
 
@@ -8194,12 +8183,14 @@ int main(int argc, char** argv) {
 #ifdef TIMEWARP_MODE
   if (timewarp_mode) {
 
-    run_to_timewarp(use_argv);
+    tw_init(use_argv);
 
     if (stop_soon) goto stop_fuzzing;
-    /*if (warp_stage == STAGE_TIMEWARP) {
-      timewarp();
-    }*/
+
+    timewarp();
+
+    if (stop_soon) goto stop_fuzzing;
+
   }
 #endif /* TIMEWARP_MODE */
 

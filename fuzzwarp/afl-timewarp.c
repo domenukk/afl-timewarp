@@ -21,6 +21,7 @@
  * @param ... the fds. Will ignore negative values.
  * @return the max count
  */
+
 int close_others(int count, ...) {
 
   int keep_fds[count];
@@ -278,11 +279,13 @@ static void start_tap_server(char *port, stdpipes *stdio, stdpipes *stdio_tap) {
   );
 
   if (stdio_tap) {
+
     CLOSE_ALL(
         _W(stdio_tap->in),
         _W(stdio_tap->out),
         _W(stdio_tap->err)
     );
+
   }
 }
 
