@@ -132,7 +132,7 @@ QEMU is a project separate from AFL, but you can conveniently build the
 feature by doing:
 
 $ cd qemu_mode
-$ ./build_qemu_support.sh
+$ ./build_afl_qemu_support.sh
 
 For additional instructions and caveats, see qemu_mode/README.qemu.
 
