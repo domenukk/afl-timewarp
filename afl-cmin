@@ -51,7 +51,7 @@ TIMEOUT=none
 unset IN_DIR OUT_DIR STDIN_FILE EXTRA_PAR MEM_LIMIT_GIVEN \
   AFL_CMIN_CRASHES_ONLY AFL_CMIN_ALLOW_ANY QEMU_MODE
 
-while getopts "+i:o:f:m:t:eQC" opt; do
+while getopts "+i:o:f:m:t:eQCI" opt; do
 
   case "$opt" in 
 
@@ -77,6 +77,9 @@ while getopts "+i:o:f:m:t:eQC" opt; do
          ;;
     "C")
          export AFL_CMIN_CRASHES_ONLY=1
+         ;;
+    "I")
+         AFL_CMIN_IGNORE_FAILED_RUNS=1
          ;;
     "Q")
          EXTRA_PAR="$EXTRA_PAR -Q"
@@ -111,6 +114,7 @@ Execution control settings:
   -m megs       - memory limit for child process ($MEM_LIMIT MB)
   -t msec       - run time limit for child process (none)
   -Q            - use binary-only instrumentation (QEMU mode)
+  -I            - ignore failed runs, for example timeouts, and continue to run.
 
 Minimization settings:
 
@@ -283,17 +287,24 @@ else
 
 fi
 
-FIRST_COUNT=$((`grep -c . "$TRACE_DIR/.run_test"`))
 
-if [ "$FIRST_COUNT" -gt "0" ]; then
 
-  echo "[+] OK, $FIRST_COUNT tuples recorded."
+#We don't want to abort on timeouts for FExM
+if [ "$AFL_CMIN_IGNORE_FAILED_RUNS" = "" ]; then
 
-else
+    FIRST_COUNT=$((`grep -c . "$TRACE_DIR/.run_test"`))
 
-  echo "[-] Error: no instrumentation output detected (perhaps crash or timeout)." 1>&2
-  test "$AFL_KEEP_TRACES" = "" && rm -rf "$TRACE_DIR"
-  exit 1
+    if [ "$FIRST_COUNT" -gt "0" ]; then
+
+      echo "[+] OK, $FIRST_COUNT tuples recorded."
+
+    else
+
+      echo "[-] Error: no instrumentation output detected (perhaps crash or timeout)." 1>&2
+      test "$AFL_KEEP_TRACES" = "" && rm -rf "$TRACE_DIR"
+      exit 1
+
+    fi
 
 fi
 
