@@ -19,7 +19,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_STANDARD 11)
 
 add_executable(fuzzwarp
-        qemu_mode/patches/afl-qemu-cpu-inl.h
+        qemu_mode/afl-qemu-cpu-inl.h
         afl-fuzz.c
         alloc-inl.h
         config.h
