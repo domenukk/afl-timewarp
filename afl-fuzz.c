@@ -7000,7 +7000,11 @@ EXP_ST void check_binary(u8* fname) {
   }
 
   if (qemu_mode &&
-      memmem(f_data, f_len, SHM_ENV_VAR, strlen(SHM_ENV_VAR) + 1)) {
+      memmem(f_data, f_len, SHM_ENV_VAR, strlen(SHM_ENV_VAR) + 1)
+#ifdef TIMEWARP_MODE
+      && !getenv("AFL_IGNORE_INSTRUMENTATION")
+#endif // TIMEWARP_MDOE
+      ) {
 
     SAYF("\n" cLRD "[-] " cRST
          "This program appears to be instrumented with afl-gcc, but is being run in\n"
@@ -7140,7 +7144,7 @@ static void usage(u8* argv0) {
        "  -n            - fuzz without instrumentation (dumb mode)\n"
 #ifdef TIMEWARP_MODE
        "  -W            - run in timewarp mode (see README)\n" // TODO: README
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
        "  -x dir        - optional fuzzer dictionary (see README)\n\n"
 
        "Other stuff:\n\n"
@@ -7857,7 +7861,7 @@ void timewarp() {
 }
 
 
-#endif /* ^TIMEWARP_MODE */
+#endif /* TIMEWARP_MODE */
 
 #ifndef AFL_LIB
 
