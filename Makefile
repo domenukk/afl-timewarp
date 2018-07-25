@@ -62,10 +62,10 @@ test_x86:
 endif
 
 
-afl-fuzz.o: afl-fuzz.c ./fuzzwarp/afl-timewarp.h $(COMM_HDR) | test_x86
+afl-fuzz.o: afl-fuzz.c afl-timewarp.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 
-afl-timewarp.o: ./fuzzwarp/afl-timewarp.c ./fuzzwarp/afl-timewarp.h $(COMM_HDR) | test_x86
+afl-timewarp.o: ./fuzzwarp/afl-timewarp.c afl-timewarp.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 
 afl-gcc: afl-gcc.c $(COMM_HDR) | test_x86
@@ -75,9 +75,6 @@ afl-gcc: afl-gcc.c $(COMM_HDR) | test_x86
 afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 	ln -sf afl-as as
-
-afl-fuzz: afl-fuzz.o afl-timewarp.o | test_x86
-	$(CC) $(CFLAGS) afl-fuzz.o afl-timewarp.o -o $@ $(LDFLAGS)
 
 afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
