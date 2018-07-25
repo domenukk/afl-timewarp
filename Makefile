@@ -61,13 +61,6 @@ test_x86:
 
 endif
 
-
-afl-fuzz.o: afl-fuzz.c afl-timewarp.h $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
-afl-timewarp.o: ./fuzzwarp/afl-timewarp.c afl-timewarp.h $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
 afl-gcc: afl-gcc.c $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
 	set -e; for i in afl-g++ afl-clang afl-clang++; do ln -sf afl-gcc $$i; done
