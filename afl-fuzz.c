@@ -2064,7 +2064,6 @@ EXP_ST void init_forkserver(char** argv) {
     if (timewarp_mode) {
 
       start_timewarp_io_server(stdio_srv_port, &stdio, &stdio_tap);
-      start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
 
       ck_dup2(_R(stdio.in), 0);
       ck_dup2(_W(stdio.out), 1);
@@ -2081,8 +2080,6 @@ EXP_ST void init_forkserver(char** argv) {
       setenv("TIMEWARP_MODE", "1", 0);
 
       ck_write(st_pipe[1], "up!", 4, "write failed, did the parent die?");
-
-      //TODO: The stuff below needs to be done to start fuzzing.
 
     } else
 #endif /* TIMEWARP_MODE */
@@ -2167,6 +2164,8 @@ EXP_ST void init_forkserver(char** argv) {
 
 #ifdef TIMEWARP_MODE
   if (timewarp_mode) {
+
+    start_timewarp_cnc_server(cnc_srv_port, &cncio, &cncio_tap);
 
     /* Wait for connection process */
     if (read(fsrv_st_fd, &status, 4) < 4) RPFATAL("RIP Child.");
@@ -7819,6 +7818,7 @@ static void tw_init(char **argv) {
   warp_stage = STAGE_TIMEWARP;
 
   ssize_t len = read(_R(cncio.in), &buf, sizeof(buf));
+
   if (len < 1) PFATAL("CnC Socket no longer open");
   // TODO: Handle more problems, handle 0 return, ...
 

@@ -301,6 +301,10 @@ void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap)
 
   start_tap_server(port, cncio, cncio_tap);
 
+
+  dprintf(_W(cncio->out), "%d %d %d", cncio->in[0], cncio->in[1], cncio_tap->out[1]);
+
+
   dprintf(_W(cncio->out), "%s\n%s\n%s\n%s\n%s\n",
           "Welcome to AFL Timewarp.",
           "Start learning with \"L\"",
@@ -309,6 +313,8 @@ void start_timewarp_cnc_server(char *port, stdpipes *cncio, stdpipes *cncio_tap)
           "exit with \"E\"."); // TODO: Payload or not?
 
 }
+
+
 /**
  *
  * Start the timewarp server.
