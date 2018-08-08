@@ -7820,7 +7820,7 @@ static void tw_init(char **argv) {
 
   ssize_t len = read(_R(cncio.in), &buf, sizeof(buf));
   if (len < 1) PFATAL("CnC Socket no longer open");
-  // TODO: Handle better, handle 0 return, ...
+  // TODO: Handle more problems, handle 0 return, ...
 
   // how do we get a full line here?
   // in case we do wait for something, Send signal
@@ -8191,9 +8191,8 @@ int main(int argc, char** argv) {
 
     if (stop_soon) goto stop_fuzzing;
 
-    timewarp();
-
-    if (stop_soon) goto stop_fuzzing;
+    // TODO: timewarp();
+    //if (stop_soon) goto stop_fuzzing;
 
   }
 #endif /* TIMEWARP_MODE */

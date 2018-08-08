@@ -67,7 +67,8 @@ int close_others(int count, ...) {
 
     if (!found) {
 
-      (void) close(i);
+      int TODO = 1;
+      // TODO: Reenable!    (void) close(i);
 
     }
   }
