@@ -1,4 +1,6 @@
+libdislocator.so
 afl-analyze
+afl-qemu-trace
 afl-as
 afl-clang
 afl-clang++
@@ -10,6 +12,7 @@ afl-showmap
 afl-tmin
 as
 
+cmake-build-debug
 CMakeCache.txt
 CMakeFiles
 CMakeScripts
