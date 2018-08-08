@@ -8194,6 +8194,11 @@ int main(int argc, char** argv) {
     // TODO: timewarp();
     //if (stop_soon) goto stop_fuzzing;
 
+    // Isolating process and starting to fuzz.
+    ck_dup2(dev_null_fd, _W(stdio.out));
+    ck_dup2(dev_null_fd, _W(stdio.err));
+    // TODO: dup2(stdio)
+
   }
 #endif /* TIMEWARP_MODE */
 

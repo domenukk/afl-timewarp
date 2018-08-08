@@ -9,3 +9,4 @@ export AFL_PRELOAD=../libdislocator/libdislocator.so
 rm -rf ../fuzzwarp/test_out_tmp
 
 ./fuzzwarp -i ../fuzzwarp/test_in -o ../fuzzwarp/test_out_tmp -m none -t 1000 -Q -W -- "./reviveme" run
+
